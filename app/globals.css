@@ -1,26 +1,155 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #475569;
+  --muted-foreground: #475569;
+  --border: rgba(15, 23, 42, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  letter-spacing: -0.02em;
+  overflow-x: clip;
+}
+
+[dir="rtl"] .lucide-arrow-right,
+[dir="rtl"] .lucide-arrow-left {
+  transform: rotate(180deg);
+}
+
+[dir="rtl"] input:not([type="email"]):not([type="tel"]):not([type="number"]),
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: start;
+}
+
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="tel"] {
+  direction: ltr;
+  text-align: start;
+}
+
+html.dark {
+  color-scheme: dark;
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --card: #111827;
+  --card-foreground: #e2e8f0;
+  --muted: #94a3b8;
+  --muted-foreground: #94a3b8;
+  --border: rgba(148, 163, 184, 0.18);
+}
+
+html.dark body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+html.dark .bg-white {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+html.dark .text-slate-950,
+html.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-800,
+html.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #334155 !important;
+}
+
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark header.bg-white\/85 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: anywhere;
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.25);
+}
+
+@layer utilities {
+  .py-18 {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+  }
 }

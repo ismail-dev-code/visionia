@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520" role="img" aria-labelledby="title desc">
+  <title id="title">Visionia</title>
+  <desc id="desc">Visionia electronics store logo with a blue shopping bag, white V, orange orbit, and the tagline Smart Electronics. Better Life.</desc>
+  <defs>
+    <linearGradient id="bag" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#087cf0"/>
+      <stop offset="1" stop-color="#062d79"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff6a00"/>
+      <stop offset="1" stop-color="#ffad00"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(35 55)">
+    <path d="M205 115V80a77 77 0 0 1 154 0v47" fill="none" stroke="#0874df" stroke-width="23" stroke-linecap="round"/>
+    <rect x="105" y="135" width="350" height="290" rx="38" fill="url(#bag)"/>
+    <path d="M168 190h78l89 154 85-154h-78l-47 83-48-83z" fill="#fff"/>
+    <path d="M48 332c77-133 224-216 384-204 37 3 66 12 89 26-56-6-112 1-166 21-116 43-216 128-278 235-20 34-71-11-29-78z" fill="url(#orbit)"/>
+    <path d="M93 363c87-121 221-201 364-216 28-3 54-2 77 3-76 9-151 35-219 77-80 49-148 116-199 194-15 22-40-35-23-58z" fill="#fff" opacity=".96"/>
+    <path d="M114 385c107-124 248-199 398-207-44 20-85 46-123 76-74 58-137 130-183 211-22 38-126-30-92-80z" fill="url(#orbit)"/>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="520" y="330" font-size="210" font-weight="800" letter-spacing="5" fill="#08265f">Visionia</text>
+    <circle cx="744" cy="118" r="21" fill="#ff6500"/>
+    <circle cx="960" cy="118" r="21" fill="#08265f"/>
+    <path d="M1328 105l55 30-55 30z" fill="#ff6500"/>
+    <path d="M650 392h95" stroke="#ff7100" stroke-width="7" stroke-linecap="round"/>
+    <text x="775" y="408" font-size="43" letter-spacing="3" fill="#08265f">Smart Electronics. Better Life.</text>
+    <path d="M1450 392h95" stroke="#ff7100" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>
