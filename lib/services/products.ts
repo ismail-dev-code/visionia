@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getLocalizedText, type Locale } from "@/lib/i18n";
+import { OFFICIAL_CATEGORY_SLUGS } from "@/lib/constants/categories";
 
 export type ProductSort = "newest" | "price_asc" | "price_desc" | "popular";
 
@@ -102,6 +103,10 @@ export async function getCategories(locale: Locale = "en") {
 
   try {
     const categories = await prisma.category.findMany({
+      where: {
+        isActive: true,
+        slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+      },
       orderBy: { name: "asc" },
       include: {
         _count: {
@@ -139,12 +144,12 @@ export async function getProducts(filters: CatalogFilters = {}, locale: Locale =
   try {
     const where: Record<string, unknown> = {};
     where.isPublished = true;
-
-    if (filters.categorySlug) {
-      where.category = {
-        slug: filters.categorySlug,
-      };
-    }
+    where.category = {
+      isActive: true,
+      slug: filters.categorySlug
+        ? filters.categorySlug
+        : { in: [...OFFICIAL_CATEGORY_SLUGS] },
+    };
 
     if (filters.isFeatured !== undefined) {
       where.isFeatured = filters.isFeatured;
@@ -261,7 +266,14 @@ export async function getProductBySlug(slug: string, locale: Locale = "en") {
 
   try {
     const product = await prisma.product.findUnique({
-      where: { slug, isPublished: true },
+      where: {
+        slug,
+        isPublished: true,
+        category: {
+          isActive: true,
+          slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+        },
+      },
       include: {
         category: {
           select: { id: true, name: true, slug: true, description: true, translations: true },
@@ -345,6 +357,10 @@ export async function getRelatedProducts(
         categoryId,
         id: { not: productId },
         isPublished: true,
+        category: {
+          isActive: true,
+          slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+        },
       },
       take: limit,
       orderBy: { rating: "desc" },

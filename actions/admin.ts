@@ -6,14 +6,11 @@ import { z } from "zod";
 
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
+import {
+  isOfficialCategorySlug,
+  OFFICIAL_CATEGORY_SLUGS,
+} from "@/lib/constants/categories";
 import { isValidProductImageUrl } from "@/lib/validations/product";
-
-const categorySchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  slug: z.string().trim().min(2).max(100),
-  description: z.string().trim().max(500).optional().or(z.literal("")),
-  image: z.string().trim().max(500).optional().or(z.literal("")),
-});
 
 const localizedFieldsSchema = z.object({
   name: z.string().trim().max(200).optional(),
@@ -51,13 +48,13 @@ function parseTranslations(raw: unknown) {
 
 export type ProductActionState = {
   status: "idle" | "success" | "error";
-  error?: "invalidProduct" | "invalidImageUrl" | "missingPrimaryImage" | "duplicate";
+  sku?: string;
+  error?: "invalidProduct" | "invalidCategory" | "invalidImageUrl" | "missingPrimaryImage" | "duplicate";
 };
 
 const productSchema = z.object({
   name: z.string().trim().min(2).max(200),
   slug: z.string().trim().toLowerCase().max(150).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  sku: z.string().trim().min(1).max(100),
   categoryId: z.string().trim().min(1),
   price: z.coerce.number().finite().positive(),
   discountPrice: z.preprocess(
@@ -97,7 +94,6 @@ function getProductFormInput(formData: FormData):
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
-    sku: formData.get("sku"),
     categoryId: formData.get("categoryId"),
     price: formData.get("price"),
     discountPrice: formData.get("discountPrice"),
@@ -169,31 +165,54 @@ export async function createProduct(
     return { status: "error", error: input.error };
   }
 
+  const category = await prisma.category.findFirst({
+    where: {
+      id: input.data.categoryId,
+      isActive: true,
+      slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+    },
+    select: { id: true },
+  });
+  if (!category) {
+    return { status: "error", error: "invalidCategory" };
+  }
+
+  let sku: string;
   try {
     const { data, images } = input;
-    await prisma.product.create({
-      data: {
-        name: data.name,
-        slug: data.slug,
-        sku: data.sku,
-        categoryId: data.categoryId,
-        price: data.price,
-        discountPrice: data.discountPrice,
-        stockQuantity: data.stockQuantity,
-        shortDescription: data.shortDescription || null,
-        description: data.description || null,
-        isPublished: data.isPublished,
-        isFeatured: data.isFeatured,
-        isNewArrival: data.isNewArrival,
-        images: { create: toProductImageCreateData(images) },
-      },
+    sku = await prisma.$transaction(async (tx) => {
+      const counter = await tx.productSkuCounter.update({
+        where: { id: "product" },
+        data: { lastValue: { increment: 1 } },
+      });
+      const generatedSku = `VIS-772-${counter.lastValue}`;
+
+      await tx.product.create({
+        data: {
+          name: data.name,
+          slug: data.slug,
+          sku: generatedSku,
+          categoryId: data.categoryId,
+          price: data.price,
+          discountPrice: data.discountPrice,
+          stockQuantity: data.stockQuantity,
+          shortDescription: data.shortDescription || null,
+          description: data.description || null,
+          isPublished: data.isPublished,
+          isFeatured: data.isFeatured,
+          isNewArrival: data.isNewArrival,
+          images: { create: toProductImageCreateData(images) },
+        },
+      });
+
+      return generatedSku;
     });
   } catch (error) {
     return getPrismaActionError(error);
   }
 
   revalidateCatalogPaths(input.data.slug);
-  return { status: "success" };
+  return { status: "success", sku };
 }
 
 export async function updateProduct(
@@ -212,6 +231,18 @@ export async function updateProduct(
     return { status: "error", error: input.error };
   }
 
+  const category = await prisma.category.findFirst({
+    where: {
+      id: input.data.categoryId,
+      isActive: true,
+      slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+    },
+    select: { id: true },
+  });
+  if (!category) {
+    return { status: "error", error: "invalidCategory" };
+  }
+
   const existing = await prisma.product.findUnique({
     where: { id: productId },
     select: { slug: true },
@@ -227,7 +258,6 @@ export async function updateProduct(
       data: {
         name: data.name,
         slug: data.slug,
-        sku: data.sku,
         categoryId: data.categoryId,
         price: data.price,
         discountPrice: data.discountPrice,
@@ -249,53 +279,6 @@ export async function updateProduct(
 
   revalidateCatalogPaths(existing.slug, input.data.slug);
   return { status: "success" };
-}
-
-export async function createCategory(input: FormData | Record<string, unknown>) {
-  await requireAdmin();
-
-  const data = typeof input === "object" && input !== null && "get" in input
-    ? {
-        name: String((input as FormData).get("name") ?? ""),
-        slug: String((input as FormData).get("slug") ?? ""),
-        description: String((input as FormData).get("description") ?? ""),
-        image: String((input as FormData).get("image") ?? ""),
-        translations: String((input as FormData).get("translations") ?? ""),
-      }
-    : (input as Record<string, unknown> | undefined) ?? {};
-
-  const parsed = categorySchema.safeParse(data);
-
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Invalid category input.");
-  }
-
-  const { name, slug, description, image } = parsed.data;
-
-  const normalizedSlug = slug.trim().toLowerCase().replace(/\s+/g, "-");
-
-  const existing = await prisma.category.findFirst({
-    where: {
-      OR: [{ name: { equals: name.trim(), mode: "insensitive" } }, { slug: { equals: normalizedSlug, mode: "insensitive" } }],
-    },
-  });
-
-  if (existing) {
-    throw new Error("A category with this name or slug already exists.");
-  }
-
-  await prisma.category.create({
-    data: {
-      name: name.trim(),
-      slug: normalizedSlug,
-      description: description?.trim() || null,
-      image: image?.trim() || null,
-      translations: parseTranslations(data.translations),
-    },
-  });
-
-  revalidatePath("/admin/categories");
-  return { success: true };
 }
 
 export async function updateProductTranslations(productId: string, raw: string) {
@@ -324,10 +307,17 @@ export async function updateCategoryTranslations(categoryId: string, raw: string
     throw new Error("Category ID is required.");
   }
 
-  await prisma.category.update({
-    where: { id: categoryId },
+  const updated = await prisma.category.updateMany({
+    where: {
+      id: categoryId,
+      isActive: true,
+      slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+    },
     data: { translations: parseTranslations(raw) },
   });
+  if (updated.count !== 1) {
+    throw new Error("Official category not found.");
+  }
 
   revalidatePath("/admin/categories");
   revalidatePath("/shop");
@@ -364,6 +354,22 @@ export async function promoteUserToAdmin(formData: FormData) {
 
 export async function toggleProductPublished(productId: string, published: boolean) {
   await requireAdmin();
+
+  if (published) {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        category: {
+          isActive: true,
+          slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+        },
+      },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new Error("Assign this product to an official category before publishing.");
+    }
+  }
 
   const product = await prisma.product.update({
     where: { id: productId },
@@ -421,6 +427,17 @@ export async function updateOrderStatus(orderId: string, status: string) {
 
 export async function deleteCategory(categoryId: string) {
   await requireAdmin();
+
+  const category = await prisma.category.findUnique({
+    where: { id: categoryId },
+    select: { slug: true, isActive: true },
+  });
+  if (!category) {
+    throw new Error("Category not found.");
+  }
+  if (category.isActive || isOfficialCategorySlug(category.slug)) {
+    throw new Error("Official categories cannot be deleted.");
+  }
 
   const productCount = await prisma.product.count({ where: { categoryId } });
 

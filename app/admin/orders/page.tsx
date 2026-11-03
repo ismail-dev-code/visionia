@@ -1,10 +1,5 @@
 import { getAdminOrders } from "@/lib/services/admin";
-
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatBDT } from "@/lib/format";
 
 export default async function AdminOrdersPage() {
   const orders = await getAdminOrders();
@@ -41,7 +36,7 @@ export default async function AdminOrdersPage() {
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{order.status}</span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{currency.format(order.totalAmount)}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{formatBDT(order.totalAmount)}</td>
                     <td className="px-4 py-3 text-slate-600">{order.paymentStatus}</td>
                   </tr>
                 ))

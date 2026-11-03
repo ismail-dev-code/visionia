@@ -50,11 +50,13 @@ export function SiteHeaderClient({
   user,
   locale,
   initialCartCount,
+  categories,
 }: {
   isAdmin: boolean;
   user: SiteHeaderUser | null;
   locale: Locale;
   initialCartCount: number;
+  categories: Array<{ name: string; slug: string }>;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -152,13 +154,24 @@ export function SiteHeaderClient({
 
         <nav className="hidden items-center gap-5 text-sm font-medium text-slate-600 lg:flex lg:gap-7">
           {visibleNavItems.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className="transition hover:text-slate-900"
-            >
-              {translate(locale, `navigation.${item.key}`)}
-            </Link>
+            <div key={item.key} className="group relative">
+              <Link href={item.href} className="transition hover:text-slate-900">
+                {translate(locale, `navigation.${item.key}`)}
+              </Link>
+              {item.key === "categories" && categories.length > 0 && (
+                <div className="invisible absolute start-0 top-full z-50 min-w-56 translate-y-1 rounded-2xl border border-slate-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                  {categories.map((category) => (
+                    <Link
+                      key={category.slug}
+                      href={`/shop?category=${category.slug}`}
+                      className="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
 
@@ -266,14 +279,29 @@ export function SiteHeaderClient({
         <div className="border-t border-slate-200 bg-white lg:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4">
             {visibleNavItems.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                onClick={() => setIsOpen(false)}
-                className="rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                {translate(locale, `navigation.${item.key}`)}
-              </Link>
+              <div key={item.key}>
+                <Link
+                  href={item.href}
+                  onClick={() => setIsOpen(false)}
+                  className="block rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+                >
+                  {translate(locale, `navigation.${item.key}`)}
+                </Link>
+                {item.key === "categories" && categories.length > 0 && (
+                  <div className="ms-3 border-s-2 border-slate-100 py-1 ps-2">
+                    {categories.map((category) => (
+                      <Link
+                        key={category.slug}
+                        href={`/shop?category=${category.slug}`}
+                        onClick={() => setIsOpen(false)}
+                        className="block rounded-xl px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                      >
+                        {category.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
             {languageSelector("px-3 py-2.5")}
           </nav>

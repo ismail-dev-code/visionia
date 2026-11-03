@@ -1,4 +1,11 @@
+import { Prisma } from "@prisma/client";
+
 import { auth } from "@/lib/auth";
+import { isOfficialCategorySlug } from "@/lib/constants/categories";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_FEE,
+} from "@/lib/constants/commerce";
 import { prisma } from "@/lib/db";
 import { getLocalizedText, type Locale } from "@/lib/i18n";
 
@@ -24,6 +31,7 @@ export async function getCartSummary(locale: Locale = "en") {
           product: {
             include: {
               variants: { select: { id: true, stock: true, price: true } },
+              category: true,
               images: {
                 where: { isPrimary: true },
                 orderBy: { createdAt: "asc" },
@@ -46,33 +54,50 @@ export async function getCartSummary(locale: Locale = "en") {
     };
   }
 
-  const items = cart.items.map((line) => {
-    const unitPrice = Number(line.variant?.price ?? line.product.discountPrice ?? line.product.price);
-    const stockQuantity = line.variant?.stock ?? line.product.stockQuantity;
-    return {
-      id: line.id,
-      productId: line.productId,
-      name: getLocalizedText(line.product.translations, locale, "name", line.product.name),
-      slug: line.product.slug,
-      variantName: line.variant?.name ?? null,
-      variantValue: line.variant?.value ?? null,
-      quantity: line.quantity,
-      stockQuantity,
-      unitPrice,
-      total: unitPrice * line.quantity,
-      image: line.product.images[0]?.url ?? null,
-    };
-  });
+  const visibleItems = cart.items
+    .filter((line) =>
+      line.product.isPublished
+      && line.product.category.isActive
+      && isOfficialCategorySlug(line.product.category.slug),
+    );
+  const items = visibleItems.map((line) => {
+      const unitPrice = new Prisma.Decimal(
+        line.variant?.price ?? line.product.discountPrice ?? line.product.price,
+      );
+      const stockQuantity = line.variant?.stock ?? line.product.stockQuantity;
+      return {
+        id: line.id,
+        productId: line.productId,
+        name: getLocalizedText(line.product.translations, locale, "name", line.product.name),
+        slug: line.product.slug,
+        variantName: line.variant?.name ?? null,
+        variantValue: line.variant?.value ?? null,
+        quantity: line.quantity,
+        stockQuantity,
+        unitPrice: unitPrice.toNumber(),
+        total: unitPrice.mul(line.quantity).toNumber(),
+        image: line.product.images[0]?.url ?? null,
+      };
+    });
 
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const shippingFee = subtotal >= 3000 ? 0 : 120;
+  const subtotal = visibleItems.reduce(
+    (sum, line) => sum.plus(
+      new Prisma.Decimal(
+        line.variant?.price ?? line.product.discountPrice ?? line.product.price,
+      ).mul(line.quantity),
+    ),
+    new Prisma.Decimal(0),
+  );
+  const shippingFee = subtotal.gte(FREE_SHIPPING_THRESHOLD)
+    ? new Prisma.Decimal(0)
+    : new Prisma.Decimal(STANDARD_SHIPPING_FEE);
 
   return {
     items,
     count: items.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal,
-    shippingFee,
-    total: subtotal + shippingFee,
+    subtotal: subtotal.toNumber(),
+    shippingFee: shippingFee.toNumber(),
+    total: subtotal.plus(shippingFee).toNumber(),
   };
 }
 
@@ -94,6 +119,7 @@ export async function getBuyNowSummary(intentId: string, locale: Locale) {
       product: {
         include: {
           variants: { select: { id: true } },
+          category: true,
           images: {
             where: { isPrimary: true },
             orderBy: { createdAt: "asc" },
@@ -105,7 +131,12 @@ export async function getBuyNowSummary(intentId: string, locale: Locale) {
     },
   });
 
-  if (!intent || !intent.product.isPublished) {
+  if (
+    !intent
+    || !intent.product.isPublished
+    || !intent.product.category.isActive
+    || !isOfficialCategorySlug(intent.product.category.slug)
+  ) {
     return null;
   }
 
@@ -114,7 +145,7 @@ export async function getBuyNowSummary(intentId: string, locale: Locale) {
     return null;
   }
 
-  const unitPrice = Number(
+  const unitPrice = new Prisma.Decimal(
     intent.variant?.price ?? intent.product.discountPrice ?? intent.product.price,
   );
   const name = getLocalizedText(
@@ -132,8 +163,8 @@ export async function getBuyNowSummary(intentId: string, locale: Locale) {
     variantName: intent.variant?.name ?? null,
     variantValue: intent.variant?.value ?? null,
     quantity: intent.quantity,
-    unitPrice,
-    total: unitPrice * intent.quantity,
+    unitPrice: unitPrice.toNumber(),
+    total: unitPrice.mul(intent.quantity).toNumber(),
     image: intent.product.images[0]?.url ?? null,
   };
 }
@@ -153,6 +184,7 @@ export async function getWishlistSummary(locale: Locale = "en") {
           product: {
             include: {
               variants: { select: { id: true, stock: true, price: true } },
+              category: true,
               images: {
                 where: { isPrimary: true },
                 orderBy: { createdAt: "asc" },
@@ -169,7 +201,13 @@ export async function getWishlistSummary(locale: Locale = "en") {
     return [];
   }
 
-  return wishlist.items.map((item) => ({
+  return wishlist.items
+    .filter((item) =>
+      item.product.isPublished
+      && item.product.category.isActive
+      && isOfficialCategorySlug(item.product.category.slug),
+    )
+    .map((item) => ({
     id: item.id,
     productId: item.productId,
     name: getLocalizedText(item.product.translations, locale, "name", item.product.name),
@@ -184,5 +222,5 @@ export async function getWishlistSummary(locale: Locale = "en") {
     stockQuantity: item.product.variants.length
       ? item.product.variants.reduce((total, variant) => total + variant.stock, 0)
       : item.product.stockQuantity,
-  }));
+    }));
 }

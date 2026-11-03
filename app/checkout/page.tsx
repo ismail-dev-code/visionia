@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { auth } from "@/lib/auth";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_FEE,
+} from "@/lib/constants/commerce";
 import { formatBDT } from "@/lib/format";
 import { getTranslations } from "@/lib/i18n";
 import { getBuyNowSummary, getCartSummary } from "@/lib/services/cart";
@@ -25,6 +30,12 @@ export default async function CheckoutPage({
   const intentId = typeof params?.intent === "string" ? params.intent : undefined;
   const buyNow = intentId ? await getBuyNowSummary(intentId, locale) : null;
   const cart = intentId ? null : await getCartSummary(locale);
+  const subtotal = new Prisma.Decimal(buyNow?.total ?? cart?.subtotal ?? 0);
+  const shippingFee = buyNow
+    ? subtotal.gte(FREE_SHIPPING_THRESHOLD)
+      ? new Prisma.Decimal(0)
+      : new Prisma.Decimal(STANDARD_SHIPPING_FEE)
+    : new Prisma.Decimal(cart?.shippingFee ?? 0);
 
   if (!intentId && (!cart || cart.items.length === 0)) {
     redirect("/cart");
@@ -82,24 +93,17 @@ export default async function CheckoutPage({
               <div className="mt-5 space-y-3 text-sm text-slate-600">
                 <div className="flex justify-between">
                   <span>{t("cart.subtotal")}</span>
-                  <span>{formatBDT(buyNow ? buyNow.total : cart?.subtotal ?? 0, locale)}</span>
+                  <span>{formatBDT(subtotal, locale)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t("cart.shipping")}</span>
                   <span>
-                    {(buyNow ? buyNow.total >= 3000 : cart?.shippingFee === 0)
-                      ? t("cart.free")
-                      : formatBDT(buyNow ? 120 : cart?.shippingFee ?? 0, locale)}
+                    {shippingFee.isZero() ? t("cart.free") : formatBDT(shippingFee, locale)}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-950">
                   <span>{t("cart.total")}</span>
-                  <span>{formatBDT(
-                    buyNow
-                      ? buyNow.total + (buyNow.total >= 3000 ? 0 : 120)
-                      : cart?.total ?? 0,
-                    locale,
-                  )}</span>
+                  <span>{formatBDT(subtotal.plus(shippingFee), locale)}</span>
                 </div>
               </div>
             </aside>

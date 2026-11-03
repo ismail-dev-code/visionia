@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 
+import { getLocalizedText, type Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
+import { OFFICIAL_CATEGORY_SLUGS } from "@/lib/constants/categories";
+import { CURRENCY_CODE } from "@/lib/constants/commerce";
 
 function toNumber(value: number | string | Prisma.Decimal | null | undefined) {
   if (value instanceof Prisma.Decimal) {
@@ -142,13 +145,12 @@ export async function getAdminProducts({
   }));
 }
 
-export async function getAdminCategories({ search }: { search?: string } = {}) {
+export async function getAdminCategories(locale: Locale = "en") {
   const categories = await prisma.category.findMany({
-    where: search
-      ? {
-          OR: [{ name: { contains: search, mode: "insensitive" } }, { slug: { contains: search, mode: "insensitive" } }],
-        }
-      : undefined,
+    where: {
+      isActive: true,
+      slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+    },
     include: {
       _count: { select: { products: true } },
     },
@@ -157,13 +159,25 @@ export async function getAdminCategories({ search }: { search?: string } = {}) {
 
   return categories.map((category) => ({
     id: category.id,
-    name: category.name,
+    name: getLocalizedText(category.translations, locale, "name", category.name),
     slug: category.slug,
-    description: category.description,
+    description: getLocalizedText(category.translations, locale, "description", category.description) || null,
     translations: category.translations,
     image: category.image,
     productCount: category._count.products,
   }));
+}
+
+export async function getNextProductSku() {
+  const counter = await prisma.productSkuCounter.findUnique({
+    where: { id: "product" },
+    select: { lastValue: true },
+  });
+  if (!counter) {
+    throw new Error("Product SKU counter is not initialized. Apply pending database migrations.");
+  }
+
+  return `VIS-772-${Math.max(15000, counter.lastValue + 1)}`;
 }
 
 export async function getAdminOrders({
@@ -327,7 +341,7 @@ export async function getStoreSettings() {
     storeSubtitle: "Premium electronics essentials",
     contactEmail: "support@visionia.example",
     contactPhone: "+880 1700-000000",
-    currency: "BDT",
+    currency: CURRENCY_CODE,
     address: "Dhaka, Bangladesh",
   };
 }

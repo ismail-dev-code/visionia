@@ -1,4 +1,3 @@
-import type { ComponentProps } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,6 +11,8 @@ import {
   Star,
   Truck,
   Zap,
+  Plug,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,16 +23,15 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { HeroVisual } from "@/components/home/hero-visual";
 import { ProductCard } from "@/components/products/product-card";
 import { getTranslations } from "@/lib/i18n";
-import { getProducts } from "@/lib/services/products";
+import { getCategories, getProducts } from "@/lib/services/products";
 
-const categories = [
-  { name: "categoryMultiName", icon: PlugIcon, description: "categoryMultiDescription", slug: "multi-plugs" },
-  { name: "categoryCableName", icon: Cable, description: "categoryCableDescription", slug: "usb-cables" },
-  { name: "categoryChargersName", icon: Zap, description: "categoryChargersDescription", slug: "chargers-adapters" },
-  { name: "categoryBanksName", icon: BatteryCharging, description: "categoryBanksDescription", slug: "power-banks" },
-  { name: "categoryAudioName", icon: Headphones, description: "categoryAudioDescription", slug: "audio" },
-  { name: "categoryAccessoryName", icon: Sparkles, description: "categoryAccessoryDescription", slug: "accessories" },
-];
+const categoryIcons: Record<string, LucideIcon> = {
+  "multi-plugs": Plug,
+  "usb-cables": Cable,
+  "chargers-adapters": Zap,
+  "power-banks": BatteryCharging,
+  audio: Headphones,
+};
 
 const trustedReasons = [
   { title: "reasonAuthentic", description: "reasonAuthenticDescription", icon: BadgeCheck },
@@ -57,13 +57,10 @@ const testimonials = [
   },
 ];
 
-function PlugIcon(props: ComponentProps<typeof Cable>) {
-  return <Cable {...props} />;
-}
-
 export default async function Home() {
   const { locale, t } = await getTranslations();
-  const [featuredCatalog, newArrivalsCatalog] = await Promise.all([
+  const [categories, featuredCatalog, newArrivalsCatalog] = await Promise.all([
+    getCategories(locale),
     getProducts({ isFeatured: true, sort: "popular", limit: 4 }, locale),
     getProducts({ isNewArrival: true, sort: "newest", limit: 4 }, locale),
   ]);
@@ -146,19 +143,22 @@ export default async function Home() {
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {categories.map(({ name, icon: Icon, description, slug }) => (
-              <Link key={name} href={`/shop?category=${slug}`}>
+            {categories.map((category) => {
+              const Icon = categoryIcons[category.slug] ?? Plug;
+              return (
+              <Link key={category.id} href={`/shop?category=${category.slug}`}>
               <Card className="group overflow-hidden border-slate-200 bg-white transition hover:-translate-y-1 hover:shadow-xl">
                 <CardContent className="p-6">
                   <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 transition group-hover:bg-slate-950 group-hover:text-white">
                     <Icon className="h-6 w-6" />
                   </div>
-                  <div className="text-xl font-semibold text-slate-950">{t(`home.${name}`)}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{t(`home.${description}`)}</p>
+                  <div className="text-xl font-semibold text-slate-950">{category.name}</div>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{category.description}</p>
                 </CardContent>
               </Card>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
 

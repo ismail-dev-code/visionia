@@ -1,18 +1,13 @@
 import { Activity, DollarSign, PackageCheck, ShoppingCart, Users } from "lucide-react";
 
 import { getDashboardStats } from "@/lib/services/admin";
-
-const currency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+import { formatBDT } from "@/lib/format";
 
 export default async function AdminDashboardPage() {
   const stats = await getDashboardStats();
 
   const cards = [
-    { label: "Revenue", value: currency.format(stats.totals.revenue), icon: DollarSign, accent: "text-emerald-600 bg-emerald-50" },
+    { label: "Revenue", value: formatBDT(stats.totals.revenue), icon: DollarSign, accent: "text-emerald-600 bg-emerald-50" },
     { label: "Orders", value: String(stats.totals.orders), icon: ShoppingCart, accent: "text-cyan-600 bg-cyan-50" },
     { label: "Products", value: String(stats.totals.products), icon: PackageCheck, accent: "text-violet-600 bg-violet-50" },
     { label: "Customers", value: String(stats.totals.customers), icon: Users, accent: "text-amber-600 bg-amber-50" },
@@ -67,7 +62,7 @@ export default async function AdminDashboardPage() {
                           {order.status}
                         </span>
                       </td>
-                      <td className="py-3 font-medium text-slate-800">{currency.format(order.totalAmount)}</td>
+                      <td className="py-3 font-medium text-slate-800">{formatBDT(order.totalAmount)}</td>
                     </tr>
                   ))
                 )}

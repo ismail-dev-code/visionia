@@ -8,6 +8,15 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  isOfficialCategorySlug,
+  OFFICIAL_CATEGORY_SLUGS,
+} from "@/lib/constants/categories";
+import {
+  CURRENCY_CODE,
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_FEE,
+} from "@/lib/constants/commerce";
 import { getLocale, getLocalizedText } from "@/lib/i18n";
 
 const purchaseSchema = z.object({
@@ -35,10 +44,28 @@ const cartLineSchema = z.object({
 async function getCartQuantity(tx: Prisma.TransactionClient, userId: string) {
   const cart = await tx.cart.findUnique({
     where: { userId },
-    select: { items: { select: { quantity: true } } },
+    include: {
+      items: {
+        select: {
+          quantity: true,
+          product: {
+            select: {
+              isPublished: true,
+              category: { select: { isActive: true, slug: true } },
+            },
+          },
+        },
+      },
+    },
   });
 
-  return cart?.items.reduce((count, item) => count + item.quantity, 0) ?? 0;
+  return cart?.items.reduce((count, item) =>
+    item.product.isPublished
+      && item.product.category.isActive
+      && isOfficialCategorySlug(item.product.category.slug)
+      ? count + item.quantity
+      : count,
+  0) ?? 0;
 }
 
 async function validatePurchase(
@@ -47,10 +74,10 @@ async function validatePurchase(
 ) {
   const product = await tx.product.findUnique({
     where: { id: input.productId },
-    include: { variants: true },
+    include: { variants: true, category: true },
   });
 
-  if (!product || !product.isPublished) {
+  if (!product || !product.isPublished || !product.category.isActive || !isOfficialCategorySlug(product.category.slug)) {
     throw new Error("This product is unavailable.");
   }
 
@@ -188,14 +215,19 @@ export async function updateCartItem(cartItemId: string, quantity: number) {
 
     const item = await tx.cartItem.findFirst({
       where: { id: parsed.data.cartItemId, cartId: cart.id },
-      include: { product: true, variant: true },
+      include: { product: { include: { category: true } }, variant: true },
     });
     if (!item) {
       throw new Error("This product is no longer in your cart.");
     }
 
     const stock = item.variant?.stock ?? item.product.stockQuantity;
-    if (!item.product.isPublished || parsed.data.quantity > stock) {
+    if (
+      !item.product.isPublished
+      || !item.product.category.isActive
+      || !isOfficialCategorySlug(item.product.category.slug)
+      || parsed.data.quantity > stock
+    ) {
       throw new Error("The requested quantity exceeds the available stock.");
     }
 
@@ -234,14 +266,11 @@ export async function removeCartItem(cartItemId: string) {
   await prisma.cartItem.deleteMany({
     where: { cartId: cart.id, id: parsedId.data },
   });
-  const count = await prisma.cartItem.aggregate({
-    where: { cartId: cart.id },
-    _sum: { quantity: true },
-  });
+  const count = await prisma.$transaction((tx) => getCartQuantity(tx, userId));
 
   revalidatePath("/", "layout");
   revalidatePath("/cart");
-  return { success: true, count: count._sum.quantity ?? 0 };
+  return { success: true, count };
 }
 
 export async function toggleWishlist(productId: string) {
@@ -249,6 +278,11 @@ export async function toggleWishlist(productId: string) {
 
   if (!session?.user?.id) {
     redirect("/login");
+  }
+
+  const parsedProductId = z.string().trim().min(1).max(191).safeParse(productId);
+  if (!parsedProductId.success) {
+    throw new Error("Invalid product.");
   }
 
   const userId = session.user.id;
@@ -262,7 +296,7 @@ export async function toggleWishlist(productId: string) {
     where: {
       wishlistId_productId: {
         wishlistId: wishlist.id,
-        productId,
+        productId: parsedProductId.data,
       },
     },
   });
@@ -274,10 +308,25 @@ export async function toggleWishlist(productId: string) {
       },
     });
   } else {
+    const product = await prisma.product.findFirst({
+      where: {
+        id: parsedProductId.data,
+        isPublished: true,
+        category: {
+          isActive: true,
+          slug: { in: [...OFFICIAL_CATEGORY_SLUGS] },
+        },
+      },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new Error("This product is unavailable.");
+    }
+
     await prisma.wishlistItem.create({
       data: {
         wishlistId: wishlist.id,
-        productId,
+        productId: parsedProductId.data,
       },
     });
   }
@@ -345,9 +394,14 @@ export async function createOrderFromCart(input: {
           expiresAt: { gt: new Date() },
           order: null,
         },
-        include: { product: true, variant: true },
+        include: { product: { include: { category: true } }, variant: true },
       });
-      if (!intent || !intent.product.isPublished) {
+      if (
+        !intent
+        || !intent.product.isPublished
+        || !intent.product.category.isActive
+        || !isOfficialCategorySlug(intent.product.category.slug)
+      ) {
         throw new Error("This Buy Now checkout has expired or is no longer available.");
       }
 
@@ -382,20 +436,22 @@ export async function createOrderFromCart(input: {
         include: {
           items: {
             include: {
-              product: { include: { variants: { select: { id: true } } } },
+              product: { include: { variants: { select: { id: true } }, category: true } },
               variant: true,
             },
           },
         },
       });
-      if (!cart || cart.items.length === 0) {
+      const availableCartItems = cart?.items.filter((item) =>
+        item.product.isPublished
+        && item.product.category.isActive
+        && isOfficialCategorySlug(item.product.category.slug),
+      ) ?? [];
+      if (!cart || availableCartItems.length === 0) {
         throw new Error("Your cart is empty.");
       }
       cartId = cart.id;
-      orderItems = cart.items.map((item) => {
-        if (!item.product.isPublished) {
-          throw new Error(`${item.product.name} is no longer available.`);
-        }
+      orderItems = availableCartItems.map((item) => {
         if (item.product.variants.length > 0 && !item.variant) {
           throw new Error(`Choose an option for ${item.product.name} before checking out.`);
         }
@@ -448,9 +504,9 @@ export async function createOrderFromCart(input: {
       (sum, item) => sum.plus(item.total),
       new Prisma.Decimal(0),
     );
-    const shippingFee = subtotal.gte(3000)
+    const shippingFee = subtotal.gte(FREE_SHIPPING_THRESHOLD)
       ? new Prisma.Decimal(0)
-      : new Prisma.Decimal(120);
+      : new Prisma.Decimal(STANDARD_SHIPPING_FEE);
     const totalAmount = subtotal.plus(shippingFee);
     const address = await tx.address.create({
       data: {
@@ -474,6 +530,7 @@ export async function createOrderFromCart(input: {
         orderNumber: `VIS-${Date.now()}-${randomUUID().slice(0, 8)}`,
         subtotal,
         shippingFee,
+        currency: CURRENCY_CODE,
         totalAmount,
         notes: addressInput.notes || null,
         status: "PENDING",
@@ -495,6 +552,7 @@ export async function createOrderFromCart(input: {
             method: "COD",
             status: "PENDING",
             amount: totalAmount,
+            currency: CURRENCY_CODE,
           },
         },
       },

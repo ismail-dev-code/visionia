@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowRight, Search, SlidersHorizontal, Sparkles, Star } from "lucide-react";
 
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -29,16 +30,18 @@ export default async function ShopPage({
   const sort = (readParam(params.sort) as "newest" | "price_asc" | "price_desc" | "popular") ?? "newest";
   const page = Number(readParam(params.page) ?? "1") || 1;
 
-  const [categories, catalog] = await Promise.all([
-    getCategories(locale),
-    getProducts({
-      categorySlug,
-      search,
-      sort,
-      page,
-      limit: 12,
-    }, locale),
-  ]);
+  const categories = await getCategories(locale);
+  const activeCategory = categories.find((category) => category.slug === categorySlug);
+  if (categorySlug && !activeCategory) {
+    notFound();
+  }
+  const catalog = await getProducts({
+    categorySlug,
+    search,
+    sort,
+    page,
+    limit: 12,
+  }, locale);
 
   return (
     <>
@@ -52,7 +55,10 @@ export default async function ShopPage({
                 <Sparkles className="h-3.5 w-3.5" />
                 {t("shop.badge")}
               </Badge>
-              <h1 className="text-3xl font-semibold tracking-[-0.06em] text-slate-950 lg:text-5xl">{t("shop.title")}</h1>
+              <h1 className="text-3xl font-semibold tracking-[-0.06em] text-slate-950 lg:text-5xl">{activeCategory?.name ?? t("shop.title")}</h1>
+              {activeCategory?.description && (
+                <p className="mt-3 max-w-2xl text-slate-600">{activeCategory.description}</p>
+              )}
             </div>
 
             <div className="flex items-center gap-2 text-sm text-slate-600">
