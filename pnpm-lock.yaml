@@ -15,7 +15,7 @@ importers:
         specifier: ^5.0.0
         version: 5.9.2(@standard-schema/spec@1.1.0)(effect@3.21.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.0))(zod@4.6.7)
       '@prisma/client':
-        specifier: ^6.1.0
+        specifier: 6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       '@radix-ui/react-slot':
         specifier: ^1.5.0
@@ -100,7 +100,7 @@ importers:
         specifier: ^17.14.0
         version: 17.14.0
       prisma:
-        specifier: ^6.1.0
+        specifier: 6.19.3
         version: 6.19.3(typescript@5.9.3)
       tailwindcss:
         specifier: ^4.3.3
