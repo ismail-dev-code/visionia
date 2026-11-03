@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
+import { isValidProductImageUrl } from "@/lib/validations/product";
 
 const categorySchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -45,6 +47,204 @@ function parseTranslations(raw: unknown) {
   }
 
   return parsed.data;
+}
+
+export type ProductActionState = {
+  status: "idle" | "success" | "error";
+  error?: "invalidProduct" | "invalidImageUrl" | "missingPrimaryImage" | "duplicate";
+};
+
+const productSchema = z.object({
+  name: z.string().trim().min(2).max(200),
+  slug: z.string().trim().toLowerCase().max(150).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  sku: z.string().trim().min(1).max(100),
+  categoryId: z.string().trim().min(1),
+  price: z.coerce.number().finite().positive(),
+  discountPrice: z.preprocess(
+    (value) => (value === "" || value === null ? null : value),
+    z.coerce.number().finite().positive().nullable(),
+  ),
+  stockQuantity: z.coerce.number().int().nonnegative(),
+  shortDescription: z.string().trim().max(500),
+  description: z.string().trim().max(5000),
+  isPublished: z.boolean(),
+  isFeatured: z.boolean(),
+  isNewArrival: z.boolean(),
+}).refine(
+  (product) => product.discountPrice === null || product.discountPrice < product.price,
+  { path: ["discountPrice"] },
+);
+
+type ProductImageInput = Array<{
+  url: string;
+  sortOrder: number;
+  isPrimary: boolean;
+}>;
+
+function revalidateCatalogPaths(...slugs: string[]) {
+  revalidatePath("/", "layout");
+  revalidatePath("/shop");
+  revalidatePath("/categories");
+  revalidatePath("/admin/products");
+  for (const slug of new Set(slugs.filter(Boolean))) {
+    revalidatePath(`/product/${slug}`);
+  }
+}
+
+function getProductFormInput(formData: FormData):
+  | { error: NonNullable<ProductActionState["error"]> }
+  | { data: z.infer<typeof productSchema>; images: ProductImageInput } {
+  const parsed = productSchema.safeParse({
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    sku: formData.get("sku"),
+    categoryId: formData.get("categoryId"),
+    price: formData.get("price"),
+    discountPrice: formData.get("discountPrice"),
+    stockQuantity: formData.get("stockQuantity"),
+    shortDescription: formData.get("shortDescription") ?? "",
+    description: formData.get("description") ?? "",
+    isPublished: formData.get("isPublished") === "true",
+    isFeatured: formData.get("isFeatured") === "true",
+    isNewArrival: formData.get("isNewArrival") === "true",
+  });
+
+  if (!parsed.success) {
+    return { error: "invalidProduct" };
+  }
+
+  const rawImageUrls = formData.getAll("imageUrl").map((value) =>
+    typeof value === "string" ? value.trim() : "",
+  );
+  if (!rawImageUrls[0]) {
+    return { error: "invalidImageUrl" };
+  }
+
+  const imageEntries = rawImageUrls
+    .map((url, originalIndex) => ({ url, originalIndex }))
+    .filter(({ url }) => url.length > 0);
+  if (imageEntries.some(({ url }) => !isValidProductImageUrl(url))) {
+    return { error: "invalidImageUrl" };
+  }
+
+  const primaryImageIndex = Number(formData.get("primaryImageIndex"));
+  if (!imageEntries.some(({ originalIndex }) => originalIndex === primaryImageIndex)) {
+    return { error: "missingPrimaryImage" };
+  }
+
+  return {
+    data: parsed.data,
+    images: imageEntries.map(({ url, originalIndex }, sortOrder) => ({
+      url,
+      sortOrder,
+      isPrimary: originalIndex === primaryImageIndex,
+    })),
+  };
+}
+
+function toProductImageCreateData(images: ProductImageInput) {
+  return images.map(({ url, sortOrder, isPrimary }) => ({ url, sortOrder, isPrimary }));
+}
+
+function getPrismaActionError(error: unknown): ProductActionState {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return { status: "error", error: "duplicate" };
+  }
+
+  throw error;
+}
+
+export async function createProduct(
+  _previousState: ProductActionState,
+  formData: FormData,
+): Promise<ProductActionState> {
+  await requireAdmin();
+
+  const input = getProductFormInput(formData);
+  if ("error" in input) {
+    return { status: "error", error: input.error };
+  }
+
+  try {
+    const { data, images } = input;
+    await prisma.product.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        sku: data.sku,
+        categoryId: data.categoryId,
+        price: data.price,
+        discountPrice: data.discountPrice,
+        stockQuantity: data.stockQuantity,
+        shortDescription: data.shortDescription || null,
+        description: data.description || null,
+        isPublished: data.isPublished,
+        isFeatured: data.isFeatured,
+        isNewArrival: data.isNewArrival,
+        images: { create: toProductImageCreateData(images) },
+      },
+    });
+  } catch (error) {
+    return getPrismaActionError(error);
+  }
+
+  revalidateCatalogPaths(input.data.slug);
+  return { status: "success" };
+}
+
+export async function updateProduct(
+  _previousState: ProductActionState,
+  formData: FormData,
+): Promise<ProductActionState> {
+  await requireAdmin();
+
+  const productId = String(formData.get("productId") ?? "").trim();
+  if (!productId) {
+    return { status: "error", error: "invalidProduct" };
+  }
+
+  const input = getProductFormInput(formData);
+  if ("error" in input) {
+    return { status: "error", error: input.error };
+  }
+
+  const existing = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { slug: true },
+  });
+  if (!existing) {
+    return { status: "error", error: "invalidProduct" };
+  }
+
+  try {
+    const { data, images } = input;
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        name: data.name,
+        slug: data.slug,
+        sku: data.sku,
+        categoryId: data.categoryId,
+        price: data.price,
+        discountPrice: data.discountPrice,
+        stockQuantity: data.stockQuantity,
+        shortDescription: data.shortDescription || null,
+        description: data.description || null,
+        isPublished: data.isPublished,
+        isFeatured: data.isFeatured,
+        isNewArrival: data.isNewArrival,
+        images: {
+          deleteMany: {},
+          create: toProductImageCreateData(images),
+        },
+      },
+    });
+  } catch (error) {
+    return getPrismaActionError(error);
+  }
+
+  revalidateCatalogPaths(existing.slug, input.data.slug);
+  return { status: "success" };
 }
 
 export async function createCategory(input: FormData | Record<string, unknown>) {
@@ -161,36 +361,39 @@ export async function promoteUserToAdmin(formData: FormData) {
 export async function toggleProductPublished(productId: string, published: boolean) {
   await requireAdmin();
 
-  await prisma.product.update({
+  const product = await prisma.product.update({
     where: { id: productId },
     data: { isPublished: published },
+    select: { slug: true },
   });
 
-  revalidatePath("/admin/products");
+  revalidateCatalogPaths(product.slug);
   return { success: true };
 }
 
 export async function toggleProductFeatured(productId: string, featured: boolean) {
   await requireAdmin();
 
-  await prisma.product.update({
+  const product = await prisma.product.update({
     where: { id: productId },
     data: { isFeatured: featured },
+    select: { slug: true },
   });
 
-  revalidatePath("/admin/products");
+  revalidateCatalogPaths(product.slug);
   return { success: true };
 }
 
 export async function toggleProductArrival(productId: string, isNew: boolean) {
   await requireAdmin();
 
-  await prisma.product.update({
+  const product = await prisma.product.update({
     where: { id: productId },
     data: { isNewArrival: isNew },
+    select: { slug: true },
   });
 
-  revalidatePath("/admin/products");
+  revalidateCatalogPaths(product.slug);
   return { success: true };
 }
 
@@ -230,9 +433,17 @@ export async function deleteCategory(categoryId: string) {
 export async function deleteProduct(productId: string) {
   await requireAdmin();
 
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { slug: true },
+  });
+  if (!product) {
+    throw new Error("Product not found.");
+  }
+
   await prisma.product.delete({ where: { id: productId } });
 
-  revalidatePath("/admin/products");
+  revalidateCatalogPaths(product.slug);
   return { success: true };
 }
 

@@ -113,7 +113,10 @@ export async function getAdminProducts({
     },
     include: {
       category: { select: { id: true, name: true, slug: true } },
-      images: { where: { isPrimary: true }, take: 1 },
+      images: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: { id: true, url: true, isPrimary: true, sortOrder: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -121,8 +124,11 @@ export async function getAdminProducts({
   return products.map((product) => ({
     id: product.id,
     name: product.name,
+    description: product.description,
+    shortDescription: product.shortDescription,
     sku: product.sku,
     slug: product.slug,
+    categoryId: product.categoryId,
     category: product.category.name,
     price: toNumber(product.price),
     discountPrice: product.discountPrice ? toNumber(product.discountPrice) : null,
@@ -130,7 +136,8 @@ export async function getAdminProducts({
     isPublished: product.isPublished,
     isFeatured: product.isFeatured,
     isNewArrival: product.isNewArrival,
-    image: product.images[0]?.url ?? null,
+    images: product.images,
+    image: product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url ?? null,
     translations: product.translations,
   }));
 }

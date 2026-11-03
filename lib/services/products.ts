@@ -31,6 +31,8 @@ export type ProductListItem = {
 export type CatalogFilters = {
   categorySlug?: string;
   search?: string;
+  isFeatured?: boolean;
+  isNewArrival?: boolean;
   sort?: ProductSort;
   minPrice?: number;
   maxPrice?: number;
@@ -103,7 +105,7 @@ export async function getCategories(locale: Locale = "en") {
       orderBy: { name: "asc" },
       include: {
         _count: {
-          select: { products: true },
+          select: { products: { where: { isPublished: true } } },
         },
       },
     });
@@ -136,11 +138,20 @@ export async function getProducts(filters: CatalogFilters = {}, locale: Locale =
 
   try {
     const where: Record<string, unknown> = {};
+    where.isPublished = true;
 
     if (filters.categorySlug) {
       where.category = {
         slug: filters.categorySlug,
       };
+    }
+
+    if (filters.isFeatured !== undefined) {
+      where.isFeatured = filters.isFeatured;
+    }
+
+    if (filters.isNewArrival !== undefined) {
+      where.isNewArrival = filters.isNewArrival;
     }
 
     if (filters.search) {
@@ -195,7 +206,7 @@ export async function getProducts(filters: CatalogFilters = {}, locale: Locale =
           },
           variants: { select: { id: true, stock: true, price: true } },
           images: {
-            orderBy: { createdAt: "asc" },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
             select: { url: true, isPrimary: true },
           },
         },
@@ -250,14 +261,14 @@ export async function getProductBySlug(slug: string, locale: Locale = "en") {
 
   try {
     const product = await prisma.product.findUnique({
-      where: { slug },
+      where: { slug, isPublished: true },
       include: {
         category: {
           select: { id: true, name: true, slug: true, description: true, translations: true },
         },
         variants: true,
         images: {
-          orderBy: { createdAt: "asc" },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           select: { url: true, altText: true, isPrimary: true },
         },
         reviews: {
@@ -333,6 +344,7 @@ export async function getRelatedProducts(
       where: {
         categoryId,
         id: { not: productId },
+        isPublished: true,
       },
       take: limit,
       orderBy: { rating: "desc" },
@@ -342,7 +354,7 @@ export async function getRelatedProducts(
         },
         variants: { select: { id: true, stock: true, price: true } },
         images: {
-          orderBy: { createdAt: "asc" },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           select: { url: true, isPrimary: true },
         },
       },

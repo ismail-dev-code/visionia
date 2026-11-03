@@ -63,7 +63,10 @@ function PlugIcon(props: ComponentProps<typeof Cable>) {
 
 export default async function Home() {
   const { locale, t } = await getTranslations();
-  const { products } = await getProducts({ sort: "popular", limit: 4 }, locale);
+  const [featuredCatalog, newArrivalsCatalog] = await Promise.all([
+    getProducts({ isFeatured: true, sort: "popular", limit: 4 }, locale),
+    getProducts({ isNewArrival: true, sort: "newest", limit: 4 }, locale),
+  ]);
 
   return (
     <>
@@ -172,12 +175,31 @@ export default async function Home() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-              {products.map((product) => (
+              {featuredCatalog.products.map((product) => (
                 <ProductCard key={product.id} product={product} locale={locale} />
               ))}
             </div>
           </div>
         </section>
+
+        {newArrivalsCatalog.products.length > 0 && (
+          <section className="mx-auto max-w-7xl px-4 py-18 lg:px-6 lg:py-24">
+            <div className="mb-10 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-700">{t("home.newArrivals")}</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-slate-950">{t("home.newArrivals")}</h2>
+              </div>
+              <Button asChild variant="outline" className="rounded-full">
+                <Link href="/shop">{t("home.browseCollection")}</Link>
+              </Button>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+              {newArrivalsCatalog.products.map((product) => (
+                <ProductCard key={product.id} product={product} locale={locale} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mx-auto max-w-7xl px-4 py-18 lg:px-6 lg:py-24">
           <div className="mb-10 text-center">

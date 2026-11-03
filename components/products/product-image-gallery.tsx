@@ -5,6 +5,7 @@ import { useState } from "react";
 type ProductImage = {
   url: string;
   altText: string | null;
+  isPrimary: boolean;
 };
 
 export function ProductImageGallery({
@@ -14,7 +15,9 @@ export function ProductImageGallery({
   images: ProductImage[];
   productName: string;
 }) {
-  const [selectedImage, setSelectedImage] = useState(images[0]);
+  const [selectedImage, setSelectedImage] = useState(
+    () => images.find((image) => image.isPrimary) ?? images[0],
+  );
 
   return (
     <div className="space-y-4">

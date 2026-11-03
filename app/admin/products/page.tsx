@@ -1,7 +1,10 @@
 import { Search } from "lucide-react";
 
 import { toggleProductPublished, updateProductTranslations } from "@/actions/admin";
+import { ProductDeleteButton, ProductForm } from "@/components/admin/product-form";
+import { getTranslations } from "@/lib/i18n";
 import { getAdminProducts } from "@/lib/services/admin";
+import { getAdminCategories } from "@/lib/services/admin";
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -10,20 +13,66 @@ const currency = new Intl.NumberFormat("en-US", {
 });
 
 export default async function AdminProductsPage() {
-  const products = await getAdminProducts();
+  const [{ locale, t }, products, categories] = await Promise.all([
+    getTranslations(),
+    getAdminProducts(),
+    getAdminCategories(),
+  ]);
+  const formLabels = {
+    createTitle: t("adminProducts.createTitle"),
+    editTitle: t("adminProducts.editTitle"),
+    name: t("adminProducts.name"),
+    slug: t("adminProducts.slug"),
+    sku: t("adminProducts.sku"),
+    category: t("adminProducts.category"),
+    selectCategory: t("adminProducts.selectCategory"),
+    price: t("adminProducts.price"),
+    discountPrice: t("adminProducts.discountPrice"),
+    stockQuantity: t("adminProducts.stockQuantity"),
+    shortDescription: t("adminProducts.shortDescription"),
+    description: t("adminProducts.description"),
+    publish: t("adminProducts.publish"),
+    featured: t("adminProducts.featured"),
+    newArrival: t("adminProducts.newArrival"),
+    images: t("adminProducts.images"),
+    mainImageUrl: t("adminProducts.mainImageUrl"),
+    additionalImageUrl: t("adminProducts.additionalImageUrl"),
+    imagePlaceholder: t("adminProducts.imagePlaceholder"),
+    addAnotherImage: t("adminProducts.addAnotherImage"),
+    removeImage: t("adminProducts.removeImage"),
+    setPrimary: t("adminProducts.setPrimary"),
+    primaryImage: t("adminProducts.primaryImage"),
+    moveUp: t("adminProducts.moveUp"),
+    moveDown: t("adminProducts.moveDown"),
+    preview: t("adminProducts.preview"),
+    invalidImageUrl: t("adminProducts.invalidImageUrl"),
+    imageLoadError: t("adminProducts.imageLoadError"),
+    invalidProduct: t("adminProducts.invalidProduct"),
+    missingPrimaryImage: t("adminProducts.missingPrimaryImage"),
+    duplicate: t("adminProducts.duplicate"),
+    saveProduct: t("adminProducts.saveProduct"),
+    saving: t("adminProducts.saving"),
+    saved: t("adminProducts.saved"),
+    delete: t("adminProducts.delete"),
+    deleteConfirm: t("adminProducts.deleteConfirm"),
+  };
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-cyan-700">Catalog</div>
-          <h1 className="text-2xl font-semibold tracking-[-0.05em] text-slate-950">Products</h1>
+          <div className="text-xs uppercase tracking-[0.2em] text-cyan-700">{t("adminProducts.catalog")}</div>
+          <h1 className="text-2xl font-semibold tracking-[-0.05em] text-slate-950">{t("adminProducts.title")}</h1>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
           <Search className="h-4 w-4" />
           {products.length} items
         </div>
       </div>
+
+      <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm sm:p-6">
+        <ProductForm categories={categories.map(({ id, name }) => ({ id, name }))} labels={formLabels} locale={locale} />
+      </section>
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -75,7 +124,35 @@ export default async function AdminProductsPage() {
                       </form>
                       <details className="mt-2">
                         <summary className="cursor-pointer text-xs font-medium text-cyan-800">
-                          Edit translations
+                          {t("adminProducts.editProduct")}
+                        </summary>
+                        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                          <ProductForm
+                            categories={categories.map(({ id, name }) => ({ id, name }))}
+                            labels={formLabels}
+                            locale={locale}
+                            product={{
+                              id: product.id,
+                              name: product.name,
+                              slug: product.slug,
+                              sku: product.sku,
+                              categoryId: product.categoryId,
+                              price: product.price,
+                              discountPrice: product.discountPrice,
+                              stockQuantity: product.stockQuantity,
+                              shortDescription: product.shortDescription,
+                              description: product.description,
+                              isPublished: product.isPublished,
+                              isFeatured: product.isFeatured,
+                              isNewArrival: product.isNewArrival,
+                              images: product.images,
+                            }}
+                          />
+                        </div>
+                      </details>
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs font-medium text-cyan-800">
+                          {t("adminProducts.editTranslations")}
                         </summary>
                         <form
                           action={async (formData: FormData) => {
@@ -97,10 +174,13 @@ export default async function AdminProductsPage() {
                             className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 font-mono text-xs text-slate-800"
                           />
                           <button type="submit" className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white">
-                            Save translations
+                            {t("adminProducts.saveTranslations")}
                           </button>
                         </form>
                       </details>
+                      <div className="mt-2">
+                        <ProductDeleteButton productId={product.id} labels={formLabels} />
+                      </div>
                     </td>
                   </tr>
                 ))
