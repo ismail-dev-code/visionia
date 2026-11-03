@@ -41,31 +41,52 @@ const cartLineSchema = z.object({
   quantity: z.coerce.number().int().min(1).max(99),
 });
 
+export type AddToCartErrorCode =
+  | "auth_required"
+  | "invalid_request"
+  | "invalid_quantity"
+  | "product_not_found"
+  | "product_unavailable"
+  | "variant_unavailable"
+  | "variant_required"
+  | "out_of_stock"
+  | "insufficient_stock"
+  | "internal_error";
+
+export type AddToCartResult =
+  | { success: true; count: number }
+  | { success: false; error: AddToCartErrorCode };
+
+class CartActionError extends Error {
+  constructor(
+    readonly code: AddToCartErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CartActionError";
+  }
+}
+
 async function getCartQuantity(tx: Prisma.TransactionClient, userId: string) {
-  const cart = await tx.cart.findUnique({
-    where: { userId },
-    include: {
-      items: {
-        select: {
-          quantity: true,
-          product: {
-            select: {
-              isPublished: true,
-              category: { select: { isActive: true, slug: true } },
+  const result = await tx.cartItem.aggregate({
+    where: {
+      cart: { is: { userId } },
+      product: {
+        is: {
+          isPublished: true,
+          category: {
+            is: {
+              isActive: true,
+              slug: { in: OFFICIAL_CATEGORY_SLUGS },
             },
           },
         },
       },
     },
+    _sum: { quantity: true },
   });
 
-  return cart?.items.reduce((count, item) =>
-    item.product.isPublished
-      && item.product.category.isActive
-      && isOfficialCategorySlug(item.product.category.slug)
-      ? count + item.quantity
-      : count,
-  0) ?? 0;
+  return result._sum.quantity ?? 0;
 }
 
 async function validatePurchase(
@@ -74,11 +95,20 @@ async function validatePurchase(
 ) {
   const product = await tx.product.findUnique({
     where: { id: input.productId },
-    include: { variants: true, category: true },
+    select: {
+      id: true,
+      isPublished: true,
+      stockQuantity: true,
+      category: { select: { isActive: true, slug: true } },
+      variants: { select: { id: true, stock: true } },
+    },
   });
 
-  if (!product || !product.isPublished || !product.category.isActive || !isOfficialCategorySlug(product.category.slug)) {
-    throw new Error("This product is unavailable.");
+  if (!product) {
+    throw new CartActionError("product_not_found", "Product not found.");
+  }
+  if (!product.isPublished || !product.category.isActive || !isOfficialCategorySlug(product.category.slug)) {
+    throw new CartActionError("product_unavailable", "This product is unavailable.");
   }
 
   const variant = input.variantId
@@ -86,16 +116,17 @@ async function validatePurchase(
     : undefined;
 
   if (input.variantId && !variant) {
-    throw new Error("The selected product option is unavailable.");
+    throw new CartActionError("variant_unavailable", "The selected product option is unavailable.");
   }
 
   if (product.variants.length > 0 && !variant) {
-    throw new Error("Choose a product option before continuing.");
+    throw new CartActionError("variant_required", "Choose a product option before continuing.");
   }
 
   const available = variant?.stock ?? product.stockQuantity;
   if (available < input.quantity) {
-    throw new Error(
+    throw new CartActionError(
+      available === 0 ? "out_of_stock" : "insufficient_stock",
       available === 0
         ? "This product is out of stock."
         : `Only ${available} item${available === 1 ? "" : "s"} available.`,
@@ -105,57 +136,105 @@ async function validatePurchase(
   return { product, variant };
 }
 
-export async function addToCart(productId: string, quantity = 1, variantId?: string) {
+async function addToCartTransaction(
+  userId: string,
+  input: z.infer<typeof purchaseSchema>,
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const { product, variant } = await validatePurchase(tx, input);
+        const cart = await tx.cart.upsert({
+          where: { userId },
+          update: {},
+          create: { userId },
+        });
+        const variantKey = variant?.id ?? "";
+        const existing = await tx.cartItem.findFirst({
+          where: {
+            cartId: cart.id,
+            productId: product.id,
+            variantId: variant?.id ?? null,
+            variantKey,
+          },
+        });
+
+        if (existing && existing.quantity + input.quantity > (variant?.stock ?? product.stockQuantity)) {
+          throw new CartActionError(
+            "insufficient_stock",
+            "The requested quantity exceeds the available stock.",
+          );
+        }
+
+        if (existing) {
+          await tx.cartItem.update({
+            where: { id: existing.id },
+            data: { quantity: { increment: input.quantity } },
+          });
+        } else {
+          await tx.cartItem.create({
+            data: {
+              cartId: cart.id,
+              productId: product.id,
+              variantId: variant?.id ?? null,
+              variantKey,
+              quantity: input.quantity,
+            },
+          });
+        }
+
+        return getCartQuantity(tx, userId);
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 10_000,
+        timeout: 15_000,
+      });
+    } catch (error) {
+      const isRetryableConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError
+        && (error.code === "P2002" || error.code === "P2034");
+      if (!isRetryableConflict || attempt >= 2) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
+}
+
+export async function addToCart(
+  productId: string,
+  quantity = 1,
+  variantId?: string,
+): Promise<AddToCartResult> {
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect("/login");
+    return { success: false, error: "auth_required" };
   }
 
   const parsed = purchaseSchema.safeParse({ productId, quantity, variantId });
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Invalid cart request.");
+    return {
+      success: false,
+      error: parsed.error.issues.some((issue) => issue.path[0] === "quantity")
+        ? "invalid_quantity"
+        : "invalid_request",
+    };
   }
 
   const userId = session.user.id;
-  const count = await prisma.$transaction(async (tx) => {
-    const { product, variant } = await validatePurchase(tx, parsed.data);
-    const cart = await tx.cart.upsert({
-      where: { userId },
-      update: {},
-      create: { userId },
-    });
-    const existing = await tx.cartItem.findFirst({
-      where: {
-        cartId: cart.id,
-        productId: product.id,
-        variantId: variant?.id ?? null,
-        variantKey: variant?.id ?? "",
-      },
-    });
-
-    if (existing && existing.quantity + parsed.data.quantity > (variant?.stock ?? product.stockQuantity)) {
-      throw new Error("The requested quantity exceeds the available stock.");
+  let count: number;
+  try {
+    count = await addToCartTransaction(userId, parsed.data);
+  } catch (error) {
+    if (error instanceof CartActionError) {
+      return { success: false, error: error.code };
     }
 
-    if (existing) {
-      await tx.cartItem.update({
-        where: { id: existing.id },
-        data: { quantity: { increment: parsed.data.quantity } },
-      });
-    } else {
-      await tx.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId: product.id,
-          variantId: variant?.id ?? null,
-          quantity: parsed.data.quantity,
-        },
-      });
-    }
-
-    return getCartQuantity(tx, userId);
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    console.error("Failed to add product to cart.", error);
+    return { success: false, error: "internal_error" };
+  }
 
   revalidatePath("/", "layout");
   revalidatePath("/cart");

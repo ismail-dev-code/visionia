@@ -18,9 +18,14 @@ import { loginSchema, registerSchema } from "@/lib/validations/auth";
 type AuthFormProps = {
   mode: "login" | "register";
   locale: Locale;
+  showCartLoginMessage?: boolean;
 };
 
-export function AuthForm({ mode, locale }: AuthFormProps) {
+export function AuthForm({
+  mode,
+  locale,
+  showCartLoginMessage = false,
+}: AuthFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -144,6 +149,15 @@ export function AuthForm({ mode, locale }: AuthFormProps) {
               : translate(locale, "auth.startShopping")}
           </p>
         </div>
+
+        {isLogin && showCartLoginMessage && (
+          <p
+            role="status"
+            className="mb-5 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-3 text-sm text-cyan-900"
+          >
+            {translate(locale, "common.loginRequired")}
+          </p>
+        )}
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           {mode === "register" && (

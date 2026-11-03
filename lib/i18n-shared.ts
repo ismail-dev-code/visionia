@@ -40,7 +40,9 @@ export function translateActionError(error: unknown, locale: Locale): string {
   }
 
   const messageKeys: Array<[string, string]> = [
+    ["Product not found.", "common.productNotFound"],
     ["This product is unavailable.", "common.productUnavailable"],
+    ["This product is out of stock.", "common.outOfStockError"],
     ["The selected product option is unavailable.", "common.variantUnavailable"],
     ["Choose a product option before continuing.", "common.chooseVariant"],
     ["The requested quantity exceeds the available stock.", "common.quantityUnavailable"],

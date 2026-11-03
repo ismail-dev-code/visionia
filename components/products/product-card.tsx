@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 
+import { AddToCartButton } from "@/components/products/add-to-cart-button";
 import { formatBDT } from "@/lib/format";
 import { translate, type Locale } from "@/lib/i18n-shared";
 
@@ -96,6 +97,23 @@ export function ProductCard({
           </div>
         </div>
       </Link>
+      <div className="px-3 pb-3 sm:px-4 sm:pb-4">
+        {product.hasVariants ? (
+          <Link
+            href={`/product/${product.slug}`}
+            className="flex h-10 w-full items-center justify-center rounded-md bg-amber-400 px-4 text-sm font-medium text-slate-950 transition hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+          >
+            {translate(locale, "products.selectOptions")}
+          </Link>
+        ) : (
+          <AddToCartButton
+            productId={product.id}
+            locale={locale}
+            disabled={product.stockQuantity <= 0}
+            className="w-full rounded-md bg-amber-400 text-slate-950 hover:bg-amber-300"
+          />
+        )}
+      </div>
     </article>
   );
 }
