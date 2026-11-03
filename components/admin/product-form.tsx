@@ -354,7 +354,9 @@ export function ProductDeleteButton({
 }) {
   return (
     <form
-      action={deleteProduct.bind(null, productId)}
+      action={async () => {
+        await deleteProduct(productId);
+      }}
       onSubmit={(event) => {
         if (!window.confirm(labels.deleteConfirm)) {
           event.preventDefault();

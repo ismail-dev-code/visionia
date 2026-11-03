@@ -3,8 +3,7 @@ import { Search } from "lucide-react";
 import { toggleProductPublished, updateProductTranslations } from "@/actions/admin";
 import { ProductDeleteButton, ProductForm } from "@/components/admin/product-form";
 import { getTranslations } from "@/lib/i18n";
-import { getAdminProducts } from "@/lib/services/admin";
-import { getAdminCategories } from "@/lib/services/admin";
+import { getAdminCategories, getAdminProducts } from "@/lib/services/admin";
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -66,7 +65,7 @@ export default async function AdminProductsPage() {
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
           <Search className="h-4 w-4" />
-          {products.length} items
+          {products.length} {t("adminProducts.items")}
         </div>
       </div>
 

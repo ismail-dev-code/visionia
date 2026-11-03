@@ -127,7 +127,11 @@ function getProductFormInput(formData: FormData):
     return { error: "invalidImageUrl" };
   }
 
-  const primaryImageIndex = Number(formData.get("primaryImageIndex"));
+  const rawPrimaryImageIndex = formData.get("primaryImageIndex");
+  if (typeof rawPrimaryImageIndex !== "string" || rawPrimaryImageIndex === "") {
+    return { error: "missingPrimaryImage" };
+  }
+  const primaryImageIndex = Number(rawPrimaryImageIndex);
   if (!imageEntries.some(({ originalIndex }) => originalIndex === primaryImageIndex)) {
     return { error: "missingPrimaryImage" };
   }

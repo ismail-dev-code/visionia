@@ -26,7 +26,7 @@ Visionia aims to provide customers with a smooth shopping experience and adminis
 - Secure Admin Dashboard.
 - Role-based access control.
 - Add, edit, and delete products.
-- Upload product images.
+- Manage product images with externally hosted HTTPS URLs.
 - Manage product categories.
 - Manage inventory and stock.
 - Manage customer orders.
@@ -118,10 +118,6 @@ GOOGLE_CLIENT_SECRET=""
 RESEND_API_KEY=""
 EMAIL_FROM=""
 
-# Supabase Storage (if configured)
-NEXT_PUBLIC_SUPABASE_URL=""
-NEXT_PUBLIC_SUPABASE_ANON_KEY=""
-SUPABASE_SERVICE_ROLE_KEY=""
 ```
 
 **Important:**
@@ -233,17 +229,7 @@ When adding new website content:
 
 ## Product Image Management
 
-Product images should be stored using persistent cloud storage.
-
-If using Supabase Storage:
-
-1. Create a storage bucket.
-2. Configure appropriate access policies.
-3. Upload images through an authorized server-side process.
-4. Validate image type and file size.
-5. Store image URLs or paths in the database.
-
-Never expose the Supabase service-role key in client-side code.
+Administrators add product images by entering HTTPS image URLs in the product form. The main and additional image URLs, primary-image selection, and display order are stored as `ProductImage` records in PostgreSQL. Visionia does not upload image files or require an image-hosting API key.
 
 ## Authentication and Authorization
 
@@ -345,7 +331,7 @@ pnpm exec prisma migrate deploy
 ```
 
 8. Deploy the application.
-9. Test authentication, product management, image uploads, cart, checkout, and admin access.
+9. Test authentication, product management, cart, checkout, and admin access.
 
 Never publish production credentials.
 

@@ -15,9 +15,13 @@ export function ProductImageGallery({
   images: ProductImage[];
   productName: string;
 }) {
-  const [selectedImage, setSelectedImage] = useState(
-    () => images.find((image) => image.isPrimary) ?? images[0],
+  const [selectedImageUrl, setSelectedImageUrl] = useState(
+    () => images.find((image) => image.isPrimary)?.url ?? images[0]?.url,
   );
+  const selectedImage =
+    images.find((image) => image.url === selectedImageUrl)
+    ?? images.find((image) => image.isPrimary)
+    ?? images[0];
 
   return (
     <div className="space-y-4">
@@ -43,7 +47,7 @@ export function ProductImageGallery({
               <button
                 key={`${image.url}-${index}`}
                 type="button"
-                onClick={() => setSelectedImage(image)}
+                onClick={() => setSelectedImageUrl(image.url)}
                 aria-label={image.altText ?? `${productName} ${index + 1}`}
                 aria-pressed={isSelected}
                 className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-white p-1 transition sm:h-20 sm:w-20 ${
