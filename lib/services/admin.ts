@@ -201,22 +201,88 @@ export async function getAdminOrders({
     },
     include: {
       user: { select: { name: true, email: true } },
-      payments: { select: { status: true, method: true } },
+      payments: {
+        select: {
+          id: true,
+          status: true,
+          method: true,
+          purpose: true,
+          amount: true,
+          transactionId: true,
+          sessionKey: true,
+          validationId: true,
+          bankTransactionId: true,
+          providerReference: true,
+          providerStatus: true,
+          currency: true,
+          createdAt: true,
+          refunds: {
+            select: {
+              id: true,
+              referenceId: true,
+              providerReference: true,
+              amount: true,
+              currency: true,
+              status: true,
+              providerStatus: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 25,
   });
 
-  return orders.map((order) => ({
-    id: order.id,
-    orderNumber: order.orderNumber,
-    customer: order.user.name ?? order.user.email,
-    email: order.user.email,
-    status: order.status,
-    totalAmount: toNumber(order.totalAmount),
-    createdAt: order.createdAt,
-    paymentStatus: order.payments[0]?.status ?? "PENDING",
-  }));
+  return orders.map((order) => {
+    const advancePayment = order.payments.find((payment) => payment.purpose === "COD_ADVANCE");
+    const codRemainderPayment = order.payments.find((payment) => payment.purpose === "COD_REMAINDER");
+    const fullPayment = order.payments.find((payment) => payment.purpose === "FULL_ORDER");
+    const paymentStatus = order.paymentMethod === "COD"
+      ? order.advanceAmount.gt(0)
+        ? advancePayment?.status === "PAID"
+          ? codRemainderPayment?.status === "PAID" ? "PAID" : "ADVANCE_RECEIVED_COD_DUE"
+          : "ADVANCE_PENDING"
+        : codRemainderPayment?.status === "PAID" ? "PAID" : "COD_DUE"
+      : fullPayment?.status ?? "PENDING";
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customer: order.user.name ?? order.user.email,
+      email: order.user.email,
+      status: order.status,
+      totalAmount: toNumber(order.totalAmount),
+      shippingFee: toNumber(order.shippingFee),
+      paymentMethod: order.paymentMethod,
+      advanceAmount: toNumber(order.advanceAmount),
+      advanceAppliedToShipping: toNumber(order.advanceAppliedToShipping),
+      remainingCodAmount: toNumber(order.remainingCodAmount),
+      advancePaymentStatus: advancePayment?.status ?? "NOT_REQUIRED",
+      transactionId: advancePayment?.status === "PAID"
+        ? advancePayment.transactionId
+        : fullPayment?.transactionId ?? null,
+      providerReference: advancePayment?.status === "PAID"
+        ? advancePayment.providerReference
+        : fullPayment?.providerReference ?? null,
+      codRemainderStatus: codRemainderPayment?.status ?? "NOT_REQUIRED",
+      paymentStatus,
+      payments: order.payments.map((payment) => ({
+        ...payment,
+        amount: toNumber(payment.amount),
+        createdAt: payment.createdAt.toISOString(),
+        refunds: payment.refunds.map((refund) => ({
+          ...refund,
+          amount: toNumber(refund.amount),
+          createdAt: refund.createdAt.toISOString(),
+        })),
+      })),
+      createdAt: order.createdAt,
+    };
+  });
 }
 
 export async function getAdminCustomers({ search }: { search?: string } = {}) {

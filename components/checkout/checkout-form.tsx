@@ -3,9 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CreditCard, Truck } from "lucide-react";
 
 import { createOrderFromCart } from "@/actions/cart";
 import { Button } from "@/components/ui/button";
+import { formatBDT } from "@/lib/format";
 import {
   translate,
   translateActionError,
@@ -16,13 +18,26 @@ export function CheckoutForm({
   initialName,
   intentId,
   locale,
+  subtotal,
+  totalAmount,
+  shippingFee,
+  codAdvanceAmount,
+  advanceAppliedToShipping,
+  remainingCodAmount,
 }: {
   initialName: string;
   intentId?: string;
   locale: Locale;
+  subtotal: string;
+  totalAmount: string;
+  shippingFee: string;
+  codAdvanceAmount: string;
+  advanceAppliedToShipping: string;
+  remainingCodAmount: string;
 }) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "SSL_COMMERZ">("COD");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,9 +57,22 @@ export function CheckoutForm({
         postalCode: String(formData.get("postalCode") ?? ""),
         country: String(formData.get("country") ?? "Bangladesh"),
         notes: String(formData.get("notes") ?? ""),
-      }, intentId);
+      }, intentId, paymentMethod);
+      if (result.paymentUrl) {
+        window.location.assign(result.paymentUrl);
+        return;
+      }
+      if (result.paymentError) {
+        toast.error(translate(locale, "checkout.paymentStartFailed"));
+      }
       router.push(`/orders/${result.orderId}`);
     } catch (error) {
+      if (error instanceof Error && error.name === "UnrecognizedActionError") {
+        toast.error(translate(locale, "checkout.sessionOutdated"));
+        window.setTimeout(() => window.location.reload(), 1200);
+        return;
+      }
+
       toast.error(translateActionError(error, locale));
       setIsSubmitting(false);
     }
@@ -152,6 +180,90 @@ export function CheckoutForm({
         />
       </label>
 
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-semibold text-slate-900">
+          {translate(locale, "checkout.paymentMethod")}
+        </legend>
+        <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-cyan-700 has-[:checked]:bg-cyan-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="SSL_COMMERZ"
+            checked={paymentMethod === "SSL_COMMERZ"}
+            onChange={() => setPaymentMethod("SSL_COMMERZ")}
+            className="mt-1 accent-cyan-700"
+          />
+          <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-cyan-800" />
+          <span className="space-y-1">
+            <span className="block font-medium text-slate-900">
+              {translate(locale, "checkout.onlinePayment")}
+            </span>
+            <span className="block text-sm text-slate-600">
+              {translate(locale, "checkout.onlinePaymentDescription")}
+            </span>
+            <span className="block text-sm font-semibold text-slate-800">
+              {translate(locale, "checkout.payNow")}: {formatBDT(totalAmount, locale)}
+            </span>
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-cyan-700 has-[:checked]:bg-cyan-50">
+          <input
+            type="radio"
+            name="paymentMethod"
+            value="COD"
+            checked={paymentMethod === "COD"}
+            onChange={() => setPaymentMethod("COD")}
+            className="mt-1 accent-cyan-700"
+          />
+          <Truck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-800" />
+          <span className="min-w-0 flex-1 space-y-1">
+            <span className="block font-medium text-slate-900">
+              {translate(locale, "checkout.cashOnDelivery")}
+            </span>
+            <span className="block text-sm text-slate-600">
+              {Number(codAdvanceAmount) > 0
+                ? translate(locale, "checkout.codAdvanceDescription")
+                : translate(locale, "checkout.codNoAdvanceDescription")}
+            </span>
+          </span>
+        </label>
+
+        {paymentMethod === "COD" && (
+          <div className="space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
+            <div className="flex justify-between gap-4 text-slate-600">
+              <span>{translate(locale, "cart.subtotal")}</span>
+              <span>{formatBDT(subtotal, locale)}</span>
+            </div>
+            <div className="flex justify-between gap-4 text-slate-600">
+              <span>{translate(locale, "cart.shipping")}</span>
+              <span>{formatBDT(shippingFee, locale)}</span>
+            </div>
+            {Number(codAdvanceAmount) > 0 && (
+              <>
+                <div className="flex justify-between gap-4 text-slate-600">
+                  <span>{translate(locale, "checkout.codAdvance")}</span>
+                  <span>{formatBDT(codAdvanceAmount, locale)}</span>
+                </div>
+                <div className="flex justify-between gap-4 text-slate-600">
+                  <span>{translate(locale, "checkout.advanceApplied")}</span>
+                  <span>-{formatBDT(advanceAppliedToShipping, locale)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between gap-4 border-t border-slate-200 pt-2 font-semibold text-slate-900">
+              <span>{translate(locale, "checkout.remainingAtDelivery")}</span>
+              <span>{formatBDT(remainingCodAmount, locale)}</span>
+            </div>
+            {Number(codAdvanceAmount) > 0 && (
+              <p className="pt-1 text-xs leading-5 text-slate-500">
+                {translate(locale, "checkout.codAdvanceNotice")}
+              </p>
+            )}
+          </div>
+        )}
+      </fieldset>
+
       <label className="block space-y-2 text-sm font-medium text-slate-700">
         <span>{translate(locale, "checkout.notes")}</span>
         <textarea
@@ -166,7 +278,10 @@ export function CheckoutForm({
       <Button type="submit" disabled={isSubmitting} className="w-full rounded-full">
         {isSubmitting
           ? translate(locale, "common.loading")
-          : translate(locale, "checkout.placeOrder")}
+          : translate(
+              locale,
+              paymentMethod === "COD" ? "checkout.placeCodOrder" : "checkout.payOnline",
+            )}
       </Button>
     </form>
   );

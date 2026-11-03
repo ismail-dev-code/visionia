@@ -34,6 +34,18 @@ enum PaymentMethod {
   SSL_COMMERZ
 }
 
+enum PaymentPurpose {
+  FULL_ORDER
+  COD_ADVANCE
+  COD_REMAINDER
+}
+
+enum PaymentRefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -45,14 +57,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts   Account[]
-  sessions   Session[]
-  reviews    Review[]
-  addresses  Address[]
-  orders     Order[]
-  carts      Cart[]
-  wishlists  Wishlist[]
-  coupons    Coupon[]
+  accounts        Account[]
+  sessions        Session[]
+  reviews         Review[]
+  addresses       Address[]
+  orders          Order[]
+  carts           Cart[]
+  wishlists       Wishlist[]
+  coupons         Coupon[]
   checkoutIntents CheckoutIntent[]
 }
 
@@ -95,46 +107,46 @@ model VerificationToken {
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
+  id           String    @id @default(cuid())
+  name         String    @unique
+  slug         String    @unique
+  description  String?
   translations Json?
-  image       String?
-  isActive    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  products    Product[]
+  image        String?
+  isActive     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  products     Product[]
 }
 
 model Product {
-  id            String    @id @default(cuid())
-  name          String
-  slug          String    @unique
-  sku           String    @unique
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  sku              String   @unique
   shortDescription String?
-  description   String?
-  translations  Json?
-  price         Decimal   @db.Decimal(10, 2)
-  discountPrice Decimal?  @db.Decimal(10, 2)
-  stockQuantity Int       @default(0)
-  isFeatured    Boolean   @default(false)
-  isNewArrival  Boolean   @default(false)
-  isPublished   Boolean   @default(true)
-  rating        Float     @default(0)
-  reviewCount   Int       @default(0)
-  specifications Json?
-  categoryId    String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  description      String?
+  translations     Json?
+  price            Decimal  @db.Decimal(10, 2)
+  discountPrice    Decimal? @db.Decimal(10, 2)
+  stockQuantity    Int      @default(0)
+  isFeatured       Boolean  @default(false)
+  isNewArrival     Boolean  @default(false)
+  isPublished      Boolean  @default(true)
+  rating           Float    @default(0)
+  reviewCount      Int      @default(0)
+  specifications   Json?
+  categoryId       String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  category      Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  images        ProductImage[]
-  variants      ProductVariant[]
-  reviews       Review[]
-  cartItems     CartItem[]
-  wishlistItems WishlistItem[]
-  orderItems    OrderItem[]
+  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images          ProductImage[]
+  variants        ProductVariant[]
+  reviews         Review[]
+  cartItems       CartItem[]
+  wishlistItems   WishlistItem[]
+  orderItems      OrderItem[]
   checkoutIntents CheckoutIntent[]
 
   @@index([categoryId])
@@ -171,9 +183,9 @@ model ProductVariant {
   stock     Int      @default(0)
   createdAt DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems CartItem[]
-  orderItems OrderItem[]
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
   checkoutIntents CheckoutIntent[]
 
   @@index([productId])
@@ -191,17 +203,17 @@ model Cart {
 }
 
 model CartItem {
-  id        String   @id @default(cuid())
-  cartId    String
-  productId String
-  variantId String?
-  variantKey String @default("")
-  quantity  Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  cartId     String
+  productId  String
+  variantId  String?
+  variantKey String   @default("")
+  quantity   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
 
   @@unique([cartId, productId, variantKey])
@@ -247,53 +259,57 @@ model Address {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   orders Order[]
 
   @@index([userId])
 }
 
 model Order {
-  id               String      @id @default(cuid())
-  userId           String
-  addressId        String?
-  checkoutIntentId String?     @unique
-  orderNumber      String      @unique
-  status           OrderStatus @default(PENDING)
-  subtotal         Decimal     @db.Decimal(10, 2)
-  shippingFee      Decimal     @db.Decimal(10, 2) @default(0)
-  discountAmount   Decimal     @db.Decimal(10, 2) @default(0)
-  totalAmount      Decimal     @db.Decimal(10, 2)
-  currency         String?
-  notes            String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                       String        @id @default(cuid())
+  userId                   String
+  addressId                String?
+  checkoutIntentId         String?       @unique
+  orderNumber              String        @unique
+  status                   OrderStatus   @default(PENDING)
+  paymentMethod            PaymentMethod @default(COD)
+  subtotal                 Decimal       @db.Decimal(10, 2)
+  shippingFee              Decimal       @default(0) @db.Decimal(10, 2)
+  discountAmount           Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount              Decimal       @db.Decimal(10, 2)
+  advanceAmount            Decimal       @default(0) @db.Decimal(10, 2)
+  advanceAppliedToShipping Decimal       @default(0) @db.Decimal(10, 2)
+  remainingCodAmount       Decimal       @default(0) @db.Decimal(10, 2)
+  currency                 String?
+  notes                    String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  shippingAddress Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  checkoutIntent CheckoutIntent? @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
-  items       OrderItem[]
-  payments    Payment[]
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  shippingAddress Address?        @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  checkoutIntent  CheckoutIntent? @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
+  items           OrderItem[]
+  payments        Payment[]
 
   @@index([userId])
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String
-  productId   String?
-  variantId   String?
-  variantName String?
+  id           String   @id @default(cuid())
+  orderId      String
+  productId    String?
+  variantId    String?
+  variantName  String?
   variantValue String?
-  productName String
-  productSlug String
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  quantity    Int
-  total       Decimal  @db.Decimal(10, 2)
-  createdAt   DateTime @default(now())
+  productName  String
+  productSlug  String
+  unitPrice    Decimal  @db.Decimal(10, 2)
+  quantity     Int
+  total        Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
@@ -319,21 +335,53 @@ model CheckoutIntent {
 }
 
 model Payment {
-  id          String        @id @default(cuid())
-  orderId     String
-  method      PaymentMethod @default(COD)
-  status      PaymentStatus @default(PENDING)
-  amount      Decimal       @db.Decimal(10, 2)
-  currency    String?
-  transactionId String?
-  provider    String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                String         @id @default(cuid())
+  orderId           String
+  method            PaymentMethod  @default(COD)
+  purpose           PaymentPurpose @default(FULL_ORDER)
+  status            PaymentStatus  @default(PENDING)
+  amount            Decimal        @db.Decimal(10, 2)
+  currency          String?
+  transactionId     String?
+  sessionKey        String?
+  validationId      String?
+  bankTransactionId String?
+  provider          String?
+  providerReference String?
+  providerStatus    String?
+  gatewayUrl        String?
+  verifiedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds PaymentRefund[]
 
   @@unique([orderId, transactionId])
+  @@unique([transactionId])
   @@index([orderId])
+  @@index([sessionKey])
+  @@index([bankTransactionId])
+}
+
+model PaymentRefund {
+  id                String              @id @default(cuid())
+  paymentId         String
+  referenceId       String              @unique
+  providerReference String?
+  amount            Decimal             @db.Decimal(10, 2)
+  currency          String
+  remarks           String
+  status            PaymentRefundStatus @default(PENDING)
+  providerStatus    String?
+  checkedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([status])
 }
 
 model Coupon {
@@ -353,14 +401,14 @@ model Coupon {
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
-  rating    Int
-  title     String?
-  comment   String?
-  isApproved Boolean @default(false)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  productId  String
+  rating     Int
+  title      String?
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -369,19 +417,19 @@ model Review {
 }
 
 model Banner {
-  id          String   @id @default(cuid())
-  title       String
-  subtitle    String?
-  imageUrl    String
-  linkUrl     String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model NewsletterSubscriber {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  isActive    Boolean  @default(true)
+  id           String   @id @default(cuid())
+  email        String   @unique
+  isActive     Boolean  @default(true)
   subscribedAt DateTime @default(now())
 }

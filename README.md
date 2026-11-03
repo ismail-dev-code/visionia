@@ -14,6 +14,8 @@ Visionia aims to provide customers with a smooth shopping experience and adminis
 - Add products to cart.
 - Buy Now functionality.
 - Update cart quantities and remove products.
+- SSLCommerz hosted online payments with the official `sslcommerz-lts` Node.js SDK and server-side transaction validation.
+- Cash on delivery with a ৳50 advance when shipping is charged; the advance is credited toward the delivery balance.
 - Wishlist management.
 - Customer registration and login.
 - Google authentication.
@@ -110,6 +112,15 @@ DIRECT_URL="YOUR_SUPABASE_DIRECT_DATABASE_URL"
 AUTH_SECRET="YOUR_AUTH_SECRET"
 NEXTAUTH_URL="http://localhost:3000"
 
+# Optional version-skew protection. Set to a unique build/deployment ID in self-hosted production.
+NEXT_DEPLOYMENT_ID=""
+
+# Payment callbacks
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+SSLCOMMERZ_STORE_ID=""
+SSLCOMMERZ_STORE_PASSWORD=""
+SSLCOMMERZ_IS_SANDBOX="true"
+
 # Google OAuth
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
@@ -126,6 +137,17 @@ EMAIL_FROM=""
 - Never commit `.env` to GitHub.
 - Never expose database passwords or secret API keys.
 - Use the exact environment variable names required by your application.
+- Keep SSLCommerz credentials server-side. Configure sandbox credentials for testing, then switch `SSLCOMMERZ_IS_SANDBOX` to `false` only after the merchant account is approved for live payments.
+- `NEXT_PUBLIC_SITE_URL` must be the public HTTPS origin in production so payment callbacks return to the correct site.
+- For self-hosted deployments, set `NEXT_DEPLOYMENT_ID` to a unique value for each release so Next.js can refresh clients when Server Action versions change. Vercel deployments use `VERCEL_DEPLOYMENT_ID` automatically.
+
+### SSLCommerz and COD
+
+The checkout can collect the full order total through SSLCommerz or collect a ৳50 advance for COD orders with nonzero shipping. The advance is credited against shipping, and any remaining balance is due at delivery. When shipping is free, COD does not require an advance.
+
+SSLCommerz credentials are not included in the repository. Payment callbacks validate transactions server-side before marking payments paid. Admin order details include protected transaction/session queries and refund initiation/status checks. A submitted refund remains pending until its gateway status is queried and verified.
+
+To enable payments, add the merchant environment variables above and apply the additive payment migrations using `pnpm exec prisma migrate deploy` after reviewing them for your deployment. Do not use `prisma migrate reset` on a database with existing data.
 
 ## Database Setup
 

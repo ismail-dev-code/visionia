@@ -29,6 +29,7 @@
     "react-dom": "19.3.0",
     "react-hook-form": "^7.15.0",
     "sonner": "^2.0.0",
+    "sslcommerz-lts": "1.2.0",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.0.0",
     "zustand": "^5.0.0"

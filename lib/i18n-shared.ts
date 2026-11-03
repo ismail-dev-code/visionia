@@ -40,6 +40,10 @@ export function translateActionError(error: unknown, locale: Locale): string {
   }
 
   const messageKeys: Array<[string, string]> = [
+    ["SSLCommerz is not configured.", "checkout.paymentConfiguration"],
+    ["Set SSLCOMMERZ_IS_SANDBOX", "checkout.paymentConfiguration"],
+    ["Set NEXT_PUBLIC_SITE_URL", "checkout.paymentConfiguration"],
+    ["SSLCommerz requires an online payment", "checkout.paymentMinimum"],
     ["Product not found.", "common.productNotFound"],
     ["This product is unavailable.", "common.productUnavailable"],
     ["This product is out of stock.", "common.outOfStockError"],

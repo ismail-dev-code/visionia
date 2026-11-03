@@ -1,5 +1,7 @@
 import { getAdminOrders } from "@/lib/services/admin";
 import { formatBDT } from "@/lib/format";
+import { OrderPaymentControl } from "@/components/admin/order-payment-control";
+import { PaymentManagement } from "@/components/admin/payment-management";
 
 export default async function AdminOrdersPage() {
   const orders = await getAdminOrders();
@@ -20,13 +22,16 @@ export default async function AdminOrdersPage() {
                 <th className="px-4 py-3 font-medium">Customer</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Amount</th>
-                <th className="px-4 py-3 font-medium">Payment</th>
+                <th className="px-4 py-3 font-medium">Method / Payment</th>
+                <th className="px-4 py-3 font-medium">COD advance</th>
+                <th className="px-4 py-3 font-medium">Due on delivery</th>
+                <th className="px-4 py-3 font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-slate-500">No orders yet.</td>
+                  <td colSpan={8} className="px-4 py-6 text-slate-500">No orders yet.</td>
                 </tr>
               ) : (
                 orders.map((order) => (
@@ -37,7 +42,41 @@ export default async function AdminOrdersPage() {
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{order.status}</span>
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-800">{formatBDT(order.totalAmount)}</td>
-                    <td className="px-4 py-3 text-slate-600">{order.paymentStatus}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div>{order.paymentMethod === "COD" ? "Cash on delivery" : "SSLCommerz"}</div>
+                      <div className="text-xs">{order.paymentStatus}</div>
+                      <div className="mt-2">
+                        <PaymentManagement payments={order.payments} />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {order.advanceAmount > 0
+                        ? <>
+                            <div>{formatBDT(order.advanceAmount)}</div>
+                            <div className="text-xs">
+                              {formatBDT(order.advanceAppliedToShipping)} applied to shipping
+                            </div>
+                            <div className="text-xs">{order.advancePaymentStatus}</div>
+                          </>
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {order.paymentMethod === "COD"
+                        ? <>
+                            <div>{formatBDT(order.remainingCodAmount)}</div>
+                            <div className="text-xs">{order.codRemainderStatus}</div>
+                          </>
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <OrderPaymentControl
+                        orderId={order.id}
+                        paymentMethod={order.paymentMethod}
+                        codRemainderStatus={order.codRemainderStatus}
+                        advanceAmount={order.advanceAmount}
+                        advancePaymentStatus={order.advancePaymentStatus}
+                      />
+                    </td>
                   </tr>
                 ))
               )}

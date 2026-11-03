@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
@@ -11,6 +12,16 @@ import {
   OFFICIAL_CATEGORY_SLUGS,
 } from "@/lib/constants/categories";
 import { isValidProductImageUrl } from "@/lib/validations/product";
+import {
+  getSslCommerzString,
+  initiateSslCommerzRefund,
+  querySslCommerzRefund,
+  querySslCommerzTransactionById,
+  querySslCommerzTransactionBySessionId,
+  readSslCommerzResponse,
+} from "@/lib/payments/sslcommerz";
+import { processSslCommerzTransaction } from "@/lib/payments/sslcommerz-callback";
+import { CURRENCY_CODE } from "@/lib/constants/commerce";
 
 const localizedFieldsSchema = z.object({
   name: z.string().trim().max(200).optional(),
@@ -25,6 +36,13 @@ const translationsSchema = z.object({
 }).strict();
 
 const orderStatusSchema = z.enum(["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]);
+const paymentIdSchema = z.string().trim().min(1).max(191);
+const paymentQueryTypeSchema = z.enum(["transaction", "session"]);
+const refundInputSchema = z.object({
+  paymentId: paymentIdSchema,
+  amount: z.string().trim().max(11).regex(/^\d+(?:\.\d{1,2})?$/),
+  remarks: z.string().trim().min(3).max(100),
+});
 
 function parseTranslations(raw: unknown) {
   const text = typeof raw === "string" ? raw.trim() : "";
@@ -423,6 +441,310 @@ export async function updateOrderStatus(orderId: string, status: string) {
 
   revalidatePath("/admin/orders");
   return { success: true };
+}
+
+export async function markCodRemainderPaid(orderId: string) {
+  await requireAdmin();
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      payments: {
+        select: { purpose: true, method: true, status: true },
+      },
+    },
+  });
+  if (!order || order.paymentMethod !== "COD") {
+    throw new Error("COD order not found.");
+  }
+
+  if (
+    order.advanceAmount.gt(0)
+    && !order.payments.some((payment) =>
+      payment.purpose === "COD_ADVANCE"
+      && payment.method === "SSL_COMMERZ"
+      && payment.status === "PAID",
+    )
+  ) {
+    throw new Error("The COD advance must be verified before closing the remaining balance.");
+  }
+
+  const result = await prisma.payment.updateMany({
+    where: {
+      orderId,
+      method: "COD",
+      purpose: "COD_REMAINDER",
+      status: "PENDING",
+    },
+    data: {
+      status: "PAID",
+      providerStatus: "COLLECTED_ON_DELIVERY",
+      verifiedAt: new Date(),
+    },
+  });
+  if (result.count !== 1) {
+    throw new Error("The COD balance is already paid or unavailable.");
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath(`/orders/${orderId}`);
+  return { success: true };
+}
+
+export async function querySslCommerzPayment(
+  paymentId: string,
+  queryType: "transaction" | "session",
+) {
+  await requireAdmin();
+  const parsedId = paymentIdSchema.safeParse(paymentId);
+  const parsedQueryType = paymentQueryTypeSchema.safeParse(queryType);
+  if (!parsedId.success || !parsedQueryType.success) {
+    throw new Error("Payment not found.");
+  }
+
+  const payment = await prisma.payment.findFirst({
+    where: { id: parsedId.data, method: "SSL_COMMERZ" },
+    select: { id: true, transactionId: true, sessionKey: true },
+  });
+  if (!payment) {
+    throw new Error("SSLCommerz payment not found.");
+  }
+
+  const raw = parsedQueryType.data === "transaction"
+    ? payment.transactionId
+      ? await querySslCommerzTransactionById(payment.transactionId)
+      : null
+    : payment.sessionKey
+      ? await querySslCommerzTransactionBySessionId(payment.sessionKey)
+      : null;
+  if (!raw) {
+    throw new Error(parsedQueryType.data === "session"
+      ? "No SSLCommerz session is recorded for this payment."
+      : "No SSLCommerz transaction ID is recorded for this payment.");
+  }
+
+  const response = readSslCommerzResponse(raw);
+  const gatewayTransactionId = getSslCommerzString(response, "tran_id");
+  if (gatewayTransactionId && gatewayTransactionId !== payment.transactionId) {
+    throw new Error("SSLCommerz returned a transaction that does not match this payment.");
+  }
+
+  const validationId = getSslCommerzString(response, "val_id");
+  const gatewayStatus = getSslCommerzString(response, "status", "APIConnect") || "UNKNOWN";
+  let verified = false;
+  if (validationId && payment.transactionId) {
+    const result = await processSslCommerzTransaction(payment.transactionId, validationId);
+    verified = result.verified;
+  }
+  if (!verified) {
+    await prisma.payment.updateMany({
+      where: { id: payment.id, status: { in: ["PENDING", "FAILED"] } },
+      data: { providerStatus: gatewayStatus },
+    });
+  }
+
+  revalidatePath("/admin/orders");
+  return {
+    success: true,
+    verified,
+    status: gatewayStatus,
+  };
+}
+
+export async function initiatePaymentRefund(
+  paymentId: string,
+  amount: string,
+  remarks: string,
+) {
+  await requireAdmin();
+  const parsed = refundInputSchema.safeParse({ paymentId, amount, remarks });
+  if (!parsed.success) {
+    throw new Error("Enter a valid refund amount and reason.");
+  }
+
+  const refundAmount = new Prisma.Decimal(parsed.data.amount);
+  if (refundAmount.lte(0)) {
+    throw new Error("Refund amount must be greater than zero.");
+  }
+
+  const refund = await prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.findFirst({
+      where: {
+        id: parsed.data.paymentId,
+        method: "SSL_COMMERZ",
+        status: "PAID",
+      },
+      select: {
+        id: true,
+        amount: true,
+        currency: true,
+        bankTransactionId: true,
+      },
+    });
+    if (!payment?.bankTransactionId || payment.currency !== CURRENCY_CODE) {
+      throw new Error("This payment is not eligible for an SSLCommerz refund.");
+    }
+
+    const previousRefunds = await tx.paymentRefund.aggregate({
+      where: {
+        paymentId: payment.id,
+        status: { in: ["PENDING", "SUCCESS"] },
+      },
+      _sum: { amount: true },
+    });
+    const alreadyReserved = previousRefunds._sum.amount ?? new Prisma.Decimal(0);
+    if (alreadyReserved.plus(refundAmount).gt(payment.amount)) {
+      throw new Error("Refund amount exceeds the remaining refundable balance.");
+    }
+
+    return tx.paymentRefund.create({
+      data: {
+        paymentId: payment.id,
+        referenceId: `VRF${randomBytes(12).toString("hex")}`,
+        amount: refundAmount,
+        currency: payment.currency,
+        remarks: parsed.data.remarks,
+      },
+      select: {
+        id: true,
+        referenceId: true,
+        amount: true,
+        currency: true,
+        remarks: true,
+        payment: { select: { bankTransactionId: true } },
+      },
+    });
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 15_000,
+  });
+
+  const bankTransactionId = refund.payment.bankTransactionId;
+  if (!bankTransactionId) {
+    throw new Error("This payment does not have a confirmed bank transaction ID.");
+  }
+
+  try {
+    const raw = await initiateSslCommerzRefund({
+      amount: refund.amount.toFixed(2),
+      remarks: refund.remarks,
+      bankTransactionId,
+      referenceId: refund.referenceId,
+    });
+    const response = readSslCommerzResponse(raw);
+    const providerStatus = getSslCommerzString(response, "status", "APIConnect") || "PENDING";
+    const gatewayReference =
+      getSslCommerzString(response, "refund_ref_id", "ref_id")
+      || refund.referenceId;
+    await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        providerReference: gatewayReference,
+        providerStatus,
+        status: ["FAILED", "FAIL", "REJECTED"].includes(providerStatus.toUpperCase())
+          ? "FAILED"
+          : "PENDING",
+      },
+    });
+  } catch {
+    await prisma.paymentRefund.update({
+      where: { id: refund.id },
+      data: { providerStatus: "INITIATION_UNCONFIRMED" },
+    });
+    revalidatePath("/admin/orders");
+    throw new Error("The refund request could not be confirmed. Check its status before trying again.");
+  }
+
+  revalidatePath("/admin/orders");
+  return { success: true, refundId: refund.id };
+}
+
+export async function queryPaymentRefund(refundId: string) {
+  await requireAdmin();
+  const parsedId = paymentIdSchema.safeParse(refundId);
+  if (!parsedId.success) {
+    throw new Error("Refund not found.");
+  }
+
+  const refund = await prisma.paymentRefund.findUnique({
+    where: { id: parsedId.data },
+    select: { id: true, referenceId: true, providerReference: true, paymentId: true },
+  });
+  if (!refund) {
+    throw new Error("Refund not found.");
+  }
+
+  const raw = await querySslCommerzRefund(refund.providerReference ?? refund.referenceId);
+  const response = readSslCommerzResponse(raw);
+  const gatewayReference = getSslCommerzString(response, "refund_ref_id", "ref_id");
+  const status = getSslCommerzString(response, "status", "APIConnect");
+  if (
+    gatewayReference
+    && refund.providerReference
+    && refund.providerReference !== refund.referenceId
+    && gatewayReference !== refund.providerReference
+  ) {
+    throw new Error("SSLCommerz returned a different refund reference.");
+  }
+  const normalizedStatus = status.toUpperCase();
+  const refundStatus = ["SUCCESS", "SUCCESSFUL", "REFUNDED"].includes(normalizedStatus)
+    ? "SUCCESS"
+    : ["FAILED", "FAIL", "REJECTED", "CANCELLED"].includes(normalizedStatus)
+      ? "FAILED"
+      : "PENDING";
+
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.paymentRefund.findUnique({
+      where: { id: refund.id },
+      select: { status: true },
+    });
+    if (!existing) {
+      throw new Error("Refund not found.");
+    }
+    const finalStatus = existing.status === "SUCCESS"
+      || (existing.status === "FAILED" && refundStatus === "PENDING")
+      ? existing.status
+      : refundStatus;
+
+    await tx.paymentRefund.update({
+      where: { id: refund.id },
+      data: {
+        providerReference: gatewayReference || refund.providerReference,
+        providerStatus: status || "UNKNOWN",
+        status: finalStatus,
+        checkedAt: new Date(),
+      },
+    });
+
+    if (finalStatus === "SUCCESS") {
+      const payment = await tx.payment.findUnique({
+        where: { id: refund.paymentId },
+        select: { amount: true },
+      });
+      if (!payment) {
+        throw new Error("Refund payment not found.");
+      }
+
+      const completedRefunds = await tx.paymentRefund.aggregate({
+        where: { paymentId: refund.paymentId, status: "SUCCESS" },
+        _sum: { amount: true },
+      });
+      if ((completedRefunds._sum.amount ?? new Prisma.Decimal(0)).gte(payment.amount)) {
+        await tx.payment.update({
+          where: { id: refund.paymentId },
+          data: { status: "REFUNDED" },
+        });
+      }
+    }
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    maxWait: 10_000,
+    timeout: 15_000,
+  });
+
+  revalidatePath("/admin/orders");
+  return { success: true, status: refundStatus };
 }
 
 export async function deleteCategory(categoryId: string) {

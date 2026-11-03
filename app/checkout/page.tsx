@@ -36,6 +36,15 @@ export default async function CheckoutPage({
       ? new Prisma.Decimal(0)
       : new Prisma.Decimal(STANDARD_SHIPPING_FEE)
     : new Prisma.Decimal(cart?.shippingFee ?? 0);
+  const totalAmount = subtotal.plus(shippingFee);
+  const codAdvanceAmount = shippingFee.isZero()
+    ? new Prisma.Decimal(0)
+    : new Prisma.Decimal(50);
+  const advanceAppliedToShipping = Prisma.Decimal.min(
+    codAdvanceAmount,
+    shippingFee,
+  );
+  const remainingCodAmount = totalAmount.minus(codAdvanceAmount);
 
   if (!intentId && (!cart || cart.items.length === 0)) {
     redirect("/cart");
@@ -64,6 +73,12 @@ export default async function CheckoutPage({
               initialName={session.user?.name ?? ""}
               intentId={buyNow?.id}
               locale={locale}
+              subtotal={subtotal.toFixed(2)}
+              totalAmount={totalAmount.toFixed(2)}
+              shippingFee={shippingFee.toFixed(2)}
+              codAdvanceAmount={codAdvanceAmount.toFixed(2)}
+              advanceAppliedToShipping={advanceAppliedToShipping.toFixed(2)}
+              remainingCodAmount={remainingCodAmount.toFixed(2)}
             />
 
             <aside className="h-fit rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -103,7 +118,7 @@ export default async function CheckoutPage({
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-950">
                   <span>{t("cart.total")}</span>
-                  <span>{formatBDT(subtotal.plus(shippingFee), locale)}</span>
+                  <span>{formatBDT(totalAmount, locale)}</span>
                 </div>
               </div>
             </aside>
