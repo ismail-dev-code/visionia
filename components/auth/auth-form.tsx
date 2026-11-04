@@ -14,6 +14,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { translate, type Locale } from "@/lib/i18n-shared";
 import { loginSchema, registerSchema } from "@/lib/validations/auth";
+import Image from "next/image";
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -72,7 +73,7 @@ export function AuthForm({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : translate(locale, "common.error")
+          : translate(locale, "common.error"),
       );
     } finally {
       setIsSubmitting(false);
@@ -95,9 +96,18 @@ export function AuthForm({
             : key,
     );
   };
-  const nameError = validationMessage(form.formState.errors.name?.message, "common.error");
-  const emailError = validationMessage(form.formState.errors.email?.message, "common.error");
-  const passwordError = validationMessage(form.formState.errors.password?.message, "common.error");
+  const nameError = validationMessage(
+    form.formState.errors.name?.message,
+    "common.error",
+  );
+  const emailError = validationMessage(
+    form.formState.errors.email?.message,
+    "common.error",
+  );
+  const passwordError = validationMessage(
+    form.formState.errors.password?.message,
+    "common.error",
+  );
   const isLogin = mode === "login";
 
   return (
@@ -105,18 +115,29 @@ export function AuthForm({
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-slate-950 p-10 text-white md:flex">
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
-        <Link href="/" className="relative flex items-center gap-3" aria-label="Visionia home">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-lg font-bold text-slate-950">
-            V
-          </span>
-          <span className="text-sm font-bold tracking-[0.22em]">VISIONIA</span>
+        <Link
+          href="/"
+          className="flex shrink-0 items-center"
+          aria-label={translate(locale, "navigation.home")}
+        >
+          <Image
+            src="/visionia-logo.svg"
+            alt="Visionia Logo"
+            width={220}
+            height={80}
+            priority
+            className="block h-auto w-[130px] object-contain sm:w-[160px] lg:w-[190px]"
+          />
         </Link>
         <div className="relative max-w-sm py-12">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
             {translate(locale, "auth.thoughtful")}
           </p>
           <h2 className="text-4xl font-semibold leading-tight tracking-[-0.06em]">
-            {translate(locale, isLogin ? "auth.loginHeadline" : "auth.registerHeadline")}
+            {translate(
+              locale,
+              isLogin ? "auth.loginHeadline" : "auth.registerHeadline",
+            )}
           </h2>
           <p className="mt-5 text-sm leading-7 text-slate-300">
             {isLogin
@@ -124,13 +145,20 @@ export function AuthForm({
               : translate(locale, "auth.registerDescription")}
           </p>
         </div>
-        <p className="relative text-xs text-slate-400">{translate(locale, "auth.tagline")}</p>
+        <p className="relative text-xs text-slate-400">
+          {translate(locale, "auth.tagline")}
+        </p>
       </aside>
 
       <section className="flex flex-col justify-center p-6 sm:p-10 lg:p-14">
         <div className="mb-8 flex items-center justify-between md:justify-end">
-          <Link href="/" className="flex items-center gap-2 text-sm font-bold tracking-[0.18em] text-slate-900 md:hidden">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white">V</span>
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm font-bold tracking-[0.18em] text-slate-900 md:hidden"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-white">
+              V
+            </span>
             VISIONIA
           </Link>
           <ThemeToggle />
@@ -162,7 +190,10 @@ export function AuthForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
           {mode === "register" && (
             <div>
-              <label htmlFor="name" className="mb-2 block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="name"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
                 {translate(locale, "auth.name")}
               </label>
               <div className="relative">
@@ -178,12 +209,19 @@ export function AuthForm({
                   placeholder={translate(locale, "auth.yourName")}
                 />
               </div>
-              {nameError && <p id="name-error" className="mt-1.5 text-xs text-rose-600">{nameError}</p>}
+              {nameError && (
+                <p id="name-error" className="mt-1.5 text-xs text-rose-600">
+                  {nameError}
+                </p>
+              )}
             </div>
           )}
 
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-slate-700"
+            >
               {translate(locale, "auth.email")}
             </label>
             <div className="relative">
@@ -199,11 +237,18 @@ export function AuthForm({
                 placeholder={translate(locale, "auth.emailPlaceholder")}
               />
             </div>
-            {emailError && <p id="email-error" className="mt-1.5 text-xs text-rose-600">{emailError}</p>}
+            {emailError && (
+              <p id="email-error" className="mt-1.5 text-xs text-rose-600">
+                {emailError}
+              </p>
+            )}
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-slate-700"
+            >
               {translate(locale, "auth.password")}
             </label>
             <div className="relative">
@@ -220,27 +265,48 @@ export function AuthForm({
               />
               <button
                 type="button"
-                aria-label={translate(locale, isPasswordVisible ? "auth.hidePassword" : "auth.showPassword")}
+                aria-label={translate(
+                  locale,
+                  isPasswordVisible ? "auth.hidePassword" : "auth.showPassword",
+                )}
                 aria-pressed={isPasswordVisible}
                 onClick={() => setIsPasswordVisible((visible) => !visible)}
                 className="absolute end-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700"
               >
-                {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {isPasswordVisible ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
-            {passwordError && <p id="password-error" className="mt-1.5 text-xs text-rose-600">{passwordError}</p>}
+            {passwordError && (
+              <p id="password-error" className="mt-1.5 text-xs text-rose-600">
+                {passwordError}
+              </p>
+            )}
           </div>
 
           {error && (
-            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-700">
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-700"
+            >
               {error}
             </p>
           )}
 
-          <Button type="submit" className="h-12 w-full rounded-xl bg-slate-950" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl bg-slate-950"
+            disabled={isSubmitting}
+          >
             {isSubmitting
               ? translate(locale, "auth.submitting")
-              : translate(locale, isLogin ? "auth.loginButton" : "auth.createButton")}
+              : translate(
+                  locale,
+                  isLogin ? "auth.loginButton" : "auth.createButton",
+                )}
           </Button>
         </form>
 

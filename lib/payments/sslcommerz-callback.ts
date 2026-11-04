@@ -9,6 +9,15 @@ function getField(form: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function amountMatches(amount: string, expected: Prisma.Decimal) {
+  if (!amount) return false;
+  try {
+    return new Prisma.Decimal(amount).equals(expected);
+  } catch {
+    return false;
+  }
+}
+
 export async function processSslCommerzSuccess(form: FormData) {
   const transactionId = getField(form, "tran_id");
   const validationId = getField(form, "val_id");
@@ -39,21 +48,54 @@ export async function processSslCommerzTransaction(
   }
 
   const validation = await validateSslCommerzTransaction(validationId);
-  const isValid =
-    ["VALID", "VALIDATED"].includes(validation.status ?? "")
-    && validation.transactionId === transactionId
-    && validation.validationId === validationId
-    && validation.storeId === process.env.SSLCOMMERZ_STORE_ID?.trim()
-    && validation.currency === CURRENCY_CODE
-    && matchingPayment.currency === CURRENCY_CODE
-    && validation.riskLevel === "0"
-    && Boolean(validation.amount)
-    && new Prisma.Decimal(validation.amount ?? "0").equals(matchingPayment.amount);
+  const gatewayStatus = validation.status.toUpperCase();
+  const gatewayConfirmed = ["VALID", "VALIDATED"].includes(gatewayStatus);
+  const validationFailures = [
+    validation.transactionId === transactionId ? null : "transaction_id_mismatch",
+    validation.validationId === validationId ? null : "validation_id_mismatch",
+    validation.storeId === process.env.SSLCOMMERZ_STORE_ID?.trim()
+      ? null
+      : "store_id_mismatch",
+    validation.currency === CURRENCY_CODE
+      && matchingPayment.currency === CURRENCY_CODE
+      ? null
+      : "currency_mismatch",
+    validation.riskLevel === "0" ? null : "risk_check_failed",
+    amountMatches(validation.amount, matchingPayment.amount)
+      ? null
+      : "amount_mismatch",
+  ].filter((reason): reason is string => reason !== null);
+  const validationMatches = validationFailures.length === 0;
+  const isValid = gatewayConfirmed && validationMatches;
 
   if (!isValid) {
+    console.warn(JSON.stringify({
+      event: "sslcommerz.validation_rejected",
+      status: gatewayStatus || "MISSING",
+      reasons: gatewayConfirmed ? validationFailures : ["gateway_not_confirmed"],
+      environment: process.env.SSLCOMMERZ_IS_SANDBOX === "true"
+        ? "sandbox"
+        : process.env.SSLCOMMERZ_IS_SANDBOX === "false"
+          ? "live"
+          : "unset",
+    }));
+    const terminalFailure = [
+      "FAILED",
+      "INVALID",
+      "INVALID_TRANSACTION",
+      "CANCELLED",
+      "CANCELED",
+    ].includes(gatewayStatus);
+    const rejectedConfirmedTransaction = gatewayConfirmed && !validationMatches;
+    const nextStatus = terminalFailure || rejectedConfirmedTransaction
+      ? "FAILED"
+      : "PENDING";
     await prisma.payment.updateMany({
       where: { id: matchingPayment.id, status: "PENDING" },
-      data: { status: "FAILED", providerStatus: "VALIDATION_FAILED" },
+      data: {
+        status: nextStatus,
+        providerStatus: gatewayStatus || "VALIDATION_UNCONFIRMED",
+      },
     });
     return { orderId: matchingPayment.orderId, verified: false };
   }

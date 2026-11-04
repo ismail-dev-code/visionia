@@ -1,0 +1,13 @@
+diff --git a/api/fetch.js b/api/fetch.js
+index cb5edf99410340e00868b3085011c87a084ebcd4..577afbdb0ef25b7fd6f5fdf81deb0c21e6476602 100644
+--- a/api/fetch.js
++++ b/api/fetch.js
+@@ -2,7 +2,7 @@ const fetch = require("node-fetch");
+ const httpCall = ({url, method = 'POST', data = {}}) => {
+     // Default options are marked with *
+     return fetch(url, {
+-        method: 'POST', // *GET, POST, PUT, DELETE, etc.
++        method,
+         mode: 'cors', // no-cors, cors, *same-origin
+         cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+         credentials: 'same-origin', // include, *same-origin, omit

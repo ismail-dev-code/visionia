@@ -6,7 +6,6 @@ type SslCommerzConfig = {
   storeId: string;
   storePassword: string;
   isLive: boolean;
-  siteUrl: string;
 };
 
 export type SslCommerzPaymentInput = {
@@ -65,7 +64,6 @@ function getSslCommerzConfig(): SslCommerzConfig {
     storeId,
     storePassword,
     isLive: sandboxValue === "false",
-    siteUrl: getSslCommerzCallbackBaseUrl(),
   };
 }
 
@@ -146,7 +144,16 @@ function safeDiagnosticText(value: unknown, sensitiveValues: string[] = []) {
     if (secret) text = text.replaceAll(secret, "[redacted]");
   }
   return text
-    .replace(/(store_passwd|store_id)=([^&\s]+)/gi, "$1=[redacted]")
+    .replace(
+      /(["']?(?:store_passwd|store_password|store_id|val_id|tran_id|bank_tran_id|sessionkey|card_no|card_number)["']?\s*[:=]\s*["']?)[^"'&\s,}]+/gi,
+      "$1[redacted]",
+    )
+    .replace(
+      /(["']?(?:amount|store_amount|total_amount)["']?\s*[:=]\s*["']?)[^"'&\s,}]+/gi,
+      "$1[redacted]",
+    )
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, "[redacted number]")
+    .replace(/\b(?:\+?88)?01[3-9]\d{8}\b/g, "[redacted phone]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted email]");
 }
 
@@ -167,8 +174,12 @@ function getGatewayDiagnostic(value: unknown, sensitiveValues: string[] = []) {
     "errorCode",
     "failedreason",
     "failed_reason",
+    "error_message",
+    "err_msg",
     "message",
     "reason",
+    "APIConnect",
+    "api_connect",
   ];
   const summary: Record<string, string> = {};
   for (const key of allowedFields) {
@@ -246,6 +257,20 @@ function logSslCommerzFailure(
   }));
 }
 
+export function logSslCommerzResponse(operation: string, response: unknown) {
+  const gatewayResponse = getGatewayDiagnostic(response);
+  console.info(JSON.stringify({
+    event: "sslcommerz.response",
+    operation,
+    environment: process.env.SSLCOMMERZ_IS_SANDBOX === "true"
+      ? "sandbox"
+      : process.env.SSLCOMMERZ_IS_SANDBOX === "false"
+        ? "live"
+        : "unset",
+    gatewayResponse,
+  }));
+}
+
 async function callSdk<T>(
   operationName: string,
   operation: () => Promise<T>,
@@ -309,15 +334,16 @@ export async function initializeSslCommerzPayment(
   input: SslCommerzPaymentInput,
 ) {
   const { sdk, config } = getSdk();
+  const siteUrl = getSslCommerzCallbackBaseUrl();
   const productCategory = "Electronics";
   const result = assertSdkResponse(await callSdk("initialize", () => sdk.init({
     total_amount: input.amount,
     currency: "BDT",
     tran_id: input.transactionId,
-    success_url: `${config.siteUrl}/api/payment/sslcommerz/success`,
-    fail_url: `${config.siteUrl}/api/payment/sslcommerz/fail`,
-    cancel_url: `${config.siteUrl}/api/payment/sslcommerz/cancel`,
-    ipn_url: `${config.siteUrl}/api/payment/sslcommerz/ipn`,
+    success_url: `${siteUrl}/api/payment/sslcommerz/success`,
+    fail_url: `${siteUrl}/api/payment/sslcommerz/fail`,
+    cancel_url: `${siteUrl}/api/payment/sslcommerz/cancel`,
+    ipn_url: `${siteUrl}/api/payment/sslcommerz/ipn`,
     shipping_method: "Courier",
     num_of_item: input.itemCount,
     cus_name: input.customer.name.slice(0, 50),
@@ -393,6 +419,7 @@ export async function validateSslCommerzTransaction(validationId: string) {
   const result = assertSdkResponse(await callSdk("validate", () =>
     sdk.validate({ val_id: encodeURIComponent(validationId) }),
   ));
+  logSslCommerzResponse("validate", result);
 
   return {
     status: stringField(result, "status"),

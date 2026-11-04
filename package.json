@@ -59,6 +59,9 @@
       "@prisma/engines",
       "esbuild",
       "prisma"
-    ]
+    ],
+    "patchedDependencies": {
+      "sslcommerz-lts@1.2.0": "patches/sslcommerz-lts@1.2.0.patch"
+    }
   }
 }

@@ -15,10 +15,12 @@ import { isValidProductImageUrl } from "@/lib/validations/product";
 import {
   getSslCommerzString,
   initiateSslCommerzRefund,
+  logSslCommerzResponse,
   querySslCommerzRefund,
   querySslCommerzTransactionById,
   querySslCommerzTransactionBySessionId,
   readSslCommerzResponse,
+  SslCommerzError,
 } from "@/lib/payments/sslcommerz";
 import { processSslCommerzTransaction } from "@/lib/payments/sslcommerz-callback";
 import { CURRENCY_CODE } from "@/lib/constants/commerce";
@@ -510,45 +512,72 @@ export async function querySslCommerzPayment(
     throw new Error("SSLCommerz payment not found.");
   }
 
-  const raw = parsedQueryType.data === "transaction"
-    ? payment.transactionId
-      ? await querySslCommerzTransactionById(payment.transactionId)
-      : null
-    : payment.sessionKey
-      ? await querySslCommerzTransactionBySessionId(payment.sessionKey)
-      : null;
-  if (!raw) {
-    throw new Error(parsedQueryType.data === "session"
-      ? "No SSLCommerz session is recorded for this payment."
-      : "No SSLCommerz transaction ID is recorded for this payment.");
-  }
+  try {
+    const raw = parsedQueryType.data === "transaction"
+      ? payment.transactionId
+        ? await querySslCommerzTransactionById(payment.transactionId)
+        : null
+      : payment.sessionKey
+        ? await querySslCommerzTransactionBySessionId(payment.sessionKey)
+        : null;
+    if (!raw) {
+      throw new SslCommerzError(parsedQueryType.data === "session"
+        ? "No SSLCommerz session is recorded for this payment."
+        : "No SSLCommerz transaction ID is recorded for this payment.");
+    }
 
-  const response = readSslCommerzResponse(raw);
-  const gatewayTransactionId = getSslCommerzString(response, "tran_id");
-  if (gatewayTransactionId && gatewayTransactionId !== payment.transactionId) {
-    throw new Error("SSLCommerz returned a transaction that does not match this payment.");
-  }
+    logSslCommerzResponse(`${parsedQueryType.data}_query`, raw);
+    const response = readSslCommerzResponse(raw);
+    const gatewayTransactionId = getSslCommerzString(response, "tran_id");
+    if (gatewayTransactionId && gatewayTransactionId !== payment.transactionId) {
+      throw new SslCommerzError(
+        "SSLCommerz returned a transaction that does not match this payment.",
+      );
+    }
 
-  const validationId = getSslCommerzString(response, "val_id");
-  const gatewayStatus = getSslCommerzString(response, "status", "APIConnect") || "UNKNOWN";
-  let verified = false;
-  if (validationId && payment.transactionId) {
-    const result = await processSslCommerzTransaction(payment.transactionId, validationId);
-    verified = result.verified;
-  }
-  if (!verified) {
-    await prisma.payment.updateMany({
-      where: { id: payment.id, status: { in: ["PENDING", "FAILED"] } },
-      data: { providerStatus: gatewayStatus },
-    });
-  }
+    const validationId = getSslCommerzString(response, "val_id");
+    const gatewayStatus = getSslCommerzString(response, "status", "APIConnect") || "UNKNOWN";
+    let verified = false;
+    if (validationId && payment.transactionId) {
+      const result = await processSslCommerzTransaction(payment.transactionId, validationId);
+      verified = result.verified;
+    }
+    if (!verified && !validationId) {
+      await prisma.payment.updateMany({
+        where: { id: payment.id, status: { in: ["PENDING", "FAILED"] } },
+        data: { providerStatus: gatewayStatus },
+      });
+    }
 
-  revalidatePath("/admin/orders");
-  return {
-    success: true,
-    verified,
-    status: gatewayStatus,
-  };
+    revalidatePath("/admin/orders");
+    return {
+      success: true,
+      verified,
+      status: gatewayStatus,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof SslCommerzError
+      ? error.message
+      : "Could not verify this payment. Check the server diagnostics.";
+    console.error(JSON.stringify({
+      event: "sslcommerz.admin_verification_failed",
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof SslCommerzError
+        ? error.message
+        : "Unexpected payment verification error.",
+      environment: process.env.SSLCOMMERZ_IS_SANDBOX === "true"
+        ? "sandbox"
+        : process.env.SSLCOMMERZ_IS_SANDBOX === "false"
+          ? "live"
+          : "unset",
+    }));
+    return {
+      success: false,
+      verified: false,
+      status: "ERROR",
+      error: errorMessage,
+    };
+  }
 }
 
 export async function initiatePaymentRefund(

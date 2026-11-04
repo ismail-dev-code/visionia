@@ -53,6 +53,10 @@ export function PaymentManagement({ payments }: { payments: PaymentRecord[] }) {
     setPendingAction(key);
     try {
       const result = await querySslCommerzPayment(paymentId, type);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(
         result.verified
           ? "Gateway verified this payment."

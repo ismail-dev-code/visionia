@@ -138,7 +138,7 @@ EMAIL_FROM=""
 - Never expose database passwords or secret API keys.
 - Use the exact environment variable names required by your application.
 - Keep SSLCommerz credentials server-side. Configure sandbox credentials for testing, then switch `SSLCOMMERZ_IS_SANDBOX` to `false` only after the merchant account is approved for live payments.
-- `NEXT_PUBLIC_SITE_URL` must be the public HTTPS origin in production so payment callbacks return to the correct site.
+- Set `NEXT_PUBLIC_SITE_URL` in the same environment as the server credentials (`.env.local` for local development). It must be the public HTTPS origin in production so payment callbacks return to the correct site.
 - For self-hosted deployments, set `NEXT_DEPLOYMENT_ID` to a unique value for each release so Next.js can refresh clients when Server Action versions change. Vercel deployments use `VERCEL_DEPLOYMENT_ID` automatically.
 
 ### SSLCommerz and COD
