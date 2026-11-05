@@ -69,17 +69,18 @@ export default async function ShopPage({
         </div>
 
         <div className="mt-8 rounded-[2rem] border border-slate-200 bg-slate-50 p-5">
-          <form method="get" action="/shop" className="grid gap-4 lg:grid-cols-[1.2fr_0.7fr_0.3fr]">
+          <form method="get" action="/search" className="grid gap-4 lg:grid-cols-[1.2fr_0.7fr_0.3fr]">
             <label className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
               <Search className="h-4 w-4 text-slate-500" />
               <input
                 type="search"
-                name="search"
+                name="q"
                 defaultValue={search}
                 placeholder={t("shop.searchPlaceholder")}
                 className="w-full border-0 bg-transparent text-slate-900 placeholder:text-slate-400 focus:outline-none"
               />
             </label>
+            {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
 
             <label className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
               <SlidersHorizontal className="h-4 w-4 text-slate-500" />

@@ -179,7 +179,19 @@ export async function getProducts(filters: CatalogFilters = {}, locale: Locale =
     }
 
     if (filters.inStockOnly) {
-      where.stockQuantity = { gt: 0 };
+      where.AND = [
+        {
+          OR: [
+            {
+              AND: [
+                { variants: { none: {} } },
+                { stockQuantity: { gt: 0 } },
+              ],
+            },
+            { variants: { some: { stock: { gt: 0 } } } },
+          ],
+        },
+      ];
     }
 
     const orderBy: Record<string, string | { _count?: "desc" }> = {};
