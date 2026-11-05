@@ -352,6 +352,32 @@
     "terms": "Terms",
     "returns": "Returns"
   },
+  "faq": {
+    "eyebrow": "Here to help",
+    "title": "Frequently asked questions",
+    "description": "Find quick answers about ordering, payments, delivery, and getting support from Visionia.",
+    "questions": {
+      "ordering": "How do I place an order?",
+      "payments": "Which payment methods can I use?",
+      "shipping": "How much does shipping cost?",
+      "tracking": "How can I check my order status?",
+      "returns": "How do returns work?",
+      "products": "How can I check whether a product is right for me?",
+      "paymentIssues": "What should I do if an online payment fails?"
+    },
+    "answers": {
+      "ordering": "Add the products you want to your cart, continue to checkout, and enter your delivery details. You’ll be asked to sign in or create an account before placing your order.",
+      "payments": "Checkout offers online payment through SSLCommerz and cash on delivery. If a cash-on-delivery order has a shipping fee, a ৳50 advance may be collected and applied to that fee. Checkout shows the amounts before you place the order.",
+      "shipping": "Standard shipping is ৳120 for orders below ৳3,000. Shipping is free for orders of ৳3,000 or more. The exact charge is shown in your cart and at checkout.",
+      "tracking": "After placing an order, keep the confirmation page and your order number. The page shows your order and payment status. For help with an update, email us with your order number.",
+      "returns": "Eligible purchases have 30-day return support. Before sending an item back, email us with your order number and reason so our team can guide you through the next steps.",
+      "products": "Check the product page for its description and available options. If you’re unsure about compatibility or have another product question, contact us before ordering.",
+      "paymentIssues": "If payment doesn’t complete, open your order confirmation page and use the retry payment option if it’s available. Your order details remain on that page; contact us if you need help."
+    },
+    "supportTitle": "Still have a question?",
+    "supportDescription": "Send our team a message and include your order number if your question is about an order.",
+    "contactSupport": "Email support"
+  },
   "categories": {
     "badge": "Explore by category",
     "title": "Smart tech for every setup",
