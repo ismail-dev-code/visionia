@@ -68,8 +68,10 @@ function isSearchSuggestion(value: unknown): value is SearchSuggestion {
     typeof product.name === "string" &&
     typeof product.slug === "string" &&
     typeof product.price === "number" &&
-    (typeof product.discountPrice === "number" || product.discountPrice === null) &&
-    (typeof product.variantStartingPrice === "number" || product.variantStartingPrice === null) &&
+    (typeof product.discountPrice === "number" ||
+      product.discountPrice === null) &&
+    (typeof product.variantStartingPrice === "number" ||
+      product.variantStartingPrice === null) &&
     (typeof product.primaryImage === "string" || product.primaryImage === null)
   );
 }
@@ -138,7 +140,9 @@ export function SiteHeaderClient({
           { signal: controller.signal },
         );
         if (!response.ok) {
-          throw new Error(`Product suggestions request failed: ${response.status}`);
+          throw new Error(
+            `Product suggestions request failed: ${response.status}`,
+          );
         }
 
         const payload: unknown = await response.json();
@@ -206,233 +210,240 @@ export function SiteHeaderClient({
 
   return (
     <>
-      <header>
-      <div className="border-b border-slate-200 bg-slate-950 px-3 py-2 text-center text-[11px] font-medium text-slate-100 sm:text-sm">
-        {translate(locale, "common.freeShippingBanner")}
-      </div>
+      <header className="relative z-[110]">
+        <div className="border-b border-slate-200 bg-slate-950 px-3 py-2 text-center text-[11px] font-medium text-slate-100 sm:text-sm">
+          {translate(locale, "common.freeShippingBanner")}
+        </div>
 
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-4 sm:px-4 lg:px-6">
-          <Link
-            href="/"
-            className="col-start-1 row-start-1 flex shrink-0 items-center"
-            aria-label={translate(locale, "navigation.home")}
-          >
-            <Image
-              src="/visionia-logo.svg"
-              alt="Visionia Logo"
-              width={220}
-              height={80}
-              priority
-              className="block h-auto w-[112px] object-contain sm:w-[150px] lg:w-[180px]"
-            />
-          </Link>
-
-          <form
-            action="/search"
-            role="search"
-            className="relative col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1"
-            onFocus={() => setIsSearchOpen(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setIsSearchOpen(false);
-              }
-            }}
-          >
-            <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-slate-500 transition focus-within:border-slate-400 focus-within:bg-white">
-              <input
-                type="search"
-                name="q"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={translate(locale, "navigation.search")}
-                aria-label={translate(locale, "navigation.search")}
-                aria-autocomplete="list"
-                aria-expanded={showSearchDropdown}
-                aria-controls={showSearchDropdown ? "product-search-results" : undefined}
-                autoComplete="off"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500"
-              />
-              <button
-                type="submit"
-                aria-label={translate(locale, "productSearch.submit")}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-              >
-                <Search className="h-5 w-5" />
-              </button>
-            </label>
-
-            {showSearchDropdown && (
-              <div
-                id="product-search-results"
-                role="listbox"
-                aria-label={translate(locale, "productSearch.suggestions")}
-                className="absolute inset-x-0 top-full z-[120] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
-              >
-                {isSearchLoading ? (
-                  <p role="status" className="flex items-center gap-2 px-4 py-4 text-sm text-slate-600">
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    {translate(locale, "productSearch.loading")}
-                  </p>
-                ) : searchFailed ? (
-                  <p role="alert" className="px-4 py-4 text-sm text-rose-700">
-                    {translate(locale, "productSearch.error")}
-                  </p>
-                ) : suggestions.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {suggestions.map((product) => (
-                      <Link
-                        key={product.id}
-                        href={`/product/${product.slug}`}
-                        role="option"
-                        aria-selected="false"
-                        onClick={() => setIsSearchOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50"
-                      >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                          {product.primaryImage ? (
-                            <img
-                              src={product.primaryImage}
-                              alt=""
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <Search className="h-5 w-5 text-slate-400" />
-                          )}
-                        </div>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-slate-900">
-                            {product.name}
-                          </span>
-                          <span className="mt-1 block text-sm font-semibold text-orange-700">
-                            {translate(locale, "common.currency")}
-                            {new Intl.NumberFormat(locale).format(
-                              product.variantStartingPrice ??
-                                product.discountPrice ??
-                                product.price,
-                            )}
-                          </span>
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p role="status" className="px-4 py-4 text-sm text-slate-600">
-                    {translate(locale, "productSearch.noSuggestions")}
-                  </p>
-                )}
-                <Link
-                  href={`/search?q=${encodeURIComponent(searchTerm)}`}
-                  onClick={() => setIsSearchOpen(false)}
-                  className="block border-t border-slate-100 px-4 py-3 text-sm font-semibold text-cyan-800 transition hover:bg-slate-50"
-                >
-                  {translate(locale, "productSearch.viewAll")} “{searchTerm}”
-                </Link>
-              </div>
-            )}
-          </form>
-
-          <div className="col-start-2 row-start-1 flex items-center justify-end gap-0.5 sm:col-start-3 sm:row-start-1 sm:gap-1">
-            <ThemeToggle />
-            {languageSelector("hidden lg:block")}
-
+        <div className="border-b border-slate-200 bg-white">
+          <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-3 px-3 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-4 sm:px-4 lg:px-6">
             <Link
-              href="/wishlist"
-              aria-label={translate(locale, "navigation.wishlist")}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 sm:h-10 sm:w-10"
+              href="/"
+              className="col-start-1 row-start-1 flex shrink-0 items-center"
+              aria-label={translate(locale, "navigation.home")}
             >
-              <Heart className="h-4 w-4" />
+              <Image
+                src="/visionia-logo.svg"
+                alt="Visionia Logo"
+                width={220}
+                height={80}
+                priority
+                className="block h-auto w-[112px] object-contain sm:w-[150px] lg:w-[180px]"
+              />
             </Link>
-            {user ? (
-              <div className="relative">
+
+            <form
+              action="/search"
+              role="search"
+              className="relative col-span-2 row-start-2 sm:col-span-1 sm:col-start-2 sm:row-start-1"
+              onFocus={() => setIsSearchOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setIsSearchOpen(false);
+                }
+              }}
+            >
+              <label className="flex h-11 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-slate-500 transition focus-within:border-slate-400 focus-within:bg-white">
+                <input
+                  type="search"
+                  name="q"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={translate(locale, "navigation.search")}
+                  aria-label={translate(locale, "navigation.search")}
+                  aria-autocomplete="list"
+                  aria-expanded={showSearchDropdown}
+                  aria-controls={
+                    showSearchDropdown ? "product-search-results" : undefined
+                  }
+                  autoComplete="off"
+                  className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-500"
+                />
                 <button
-                  type="button"
-                  aria-label={translate(locale, "navigation.account")}
-                  aria-haspopup="menu"
-                  aria-expanded={isAccountOpen}
-                  onClick={() => setIsAccountOpen((value) => !value)}
-                  className="flex h-9 items-center justify-center gap-1 rounded-full px-2 text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 sm:h-10 sm:px-3"
+                  type="submit"
+                  aria-label={translate(locale, "productSearch.submit")}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                 >
-                  <UserRound className="h-4 w-4" />
-                  <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">
-                    {user.name || user.email}
-                  </span>
-                  <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
+                  <Search className="h-5 w-5" />
                 </button>
-                {isAccountOpen && (
-                  <div
-                    role="menu"
-                    aria-label={translate(locale, "navigation.account")}
-                    className="absolute end-0 top-full z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 text-start shadow-xl"
-                  >
-                    <div className="border-b border-slate-100 px-3 py-3">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {user.name || translate(locale, "navigation.welcome")}
-                      </p>
-                      <p className="truncate text-xs text-slate-500">
-                        {user.email}
-                      </p>
-                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        {translate(
-                          locale,
-                          user.role === "ADMIN"
-                            ? "navigation.administrator"
-                            : "navigation.customer",
-                        )}
-                      </p>
-                    </div>
-                    {isAdmin && (
-                      <Link
-                        href="/admin"
-                        role="menuitem"
-                        onClick={() => setIsAccountOpen(false)}
-                        className="mt-1 block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                      >
-                        {translate(locale, "navigation.admin")}
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => void signOut({ callbackUrl: "/login" })}
-                      className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+              </label>
+
+              {showSearchDropdown && (
+                <div
+                  id="product-search-results"
+                  role="listbox"
+                  aria-label={translate(locale, "productSearch.suggestions")}
+                  className="absolute inset-x-0 top-full z-[120] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                >
+                  {isSearchLoading ? (
+                    <p
+                      role="status"
+                      className="flex items-center gap-2 px-4 py-4 text-sm text-slate-600"
                     >
-                      <LogOut className="h-4 w-4" />
-                      {translate(locale, "navigation.logout")}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                      {translate(locale, "productSearch.loading")}
+                    </p>
+                  ) : searchFailed ? (
+                    <p role="alert" className="px-4 py-4 text-sm text-rose-700">
+                      {translate(locale, "productSearch.error")}
+                    </p>
+                  ) : suggestions.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {suggestions.map((product) => (
+                        <Link
+                          key={product.id}
+                          href={`/product/${product.slug}`}
+                          role="option"
+                          aria-selected="false"
+                          onClick={() => setIsSearchOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50"
+                        >
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                            {product.primaryImage ? (
+                              <img
+                                src={product.primaryImage}
+                                alt=""
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <Search className="h-5 w-5 text-slate-400" />
+                            )}
+                          </div>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-slate-900">
+                              {product.name}
+                            </span>
+                            <span className="mt-1 block text-sm font-semibold text-orange-700">
+                              {translate(locale, "common.currency")}
+                              {new Intl.NumberFormat(locale).format(
+                                product.variantStartingPrice ??
+                                  product.discountPrice ??
+                                  product.price,
+                              )}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p
+                      role="status"
+                      className="px-4 py-4 text-sm text-slate-600"
+                    >
+                      {translate(locale, "productSearch.noSuggestions")}
+                    </p>
+                  )}
+                  <Link
+                    href={`/search?q=${encodeURIComponent(searchTerm)}`}
+                    onClick={() => setIsSearchOpen(false)}
+                    className="block border-t border-slate-100 px-4 py-3 text-sm font-semibold text-cyan-800 transition hover:bg-slate-50"
+                  >
+                    {translate(locale, "productSearch.viewAll")} “{searchTerm}”
+                  </Link>
+                </div>
+              )}
+            </form>
+
+            <div className="col-start-2 row-start-1 flex items-center justify-end gap-0.5 sm:col-start-3 sm:row-start-1 sm:gap-1">
+              <ThemeToggle />
+              {languageSelector("hidden lg:block")}
+
               <Link
-                href="/login"
-                aria-label={translate(locale, "navigation.account")}
+                href="/wishlist"
+                aria-label={translate(locale, "navigation.wishlist")}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 sm:h-10 sm:w-10"
               >
-                <UserRound className="h-4 w-4" />
+                <Heart className="h-4 w-4" />
               </Link>
-            )}
-            <Link
-              href="/cart"
-              aria-label={`${translate(locale, "navigation.cart")}: ${cartCount}`}
-              className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-950 px-2.5 text-[11px] font-medium text-white transition hover:bg-slate-800 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
-            >
-              <span className="relative inline-flex">
-                <ShoppingBag className="h-4 w-4" />
-                {cartCount > 0 && (
-                  <span className="absolute -end-2 -top-2 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-bold leading-none text-slate-950">
-                    {cartCount}
-                  </span>
-                )}
-              </span>
-              <span className="hidden sm:inline">
-                {translate(locale, "navigation.cart")}
-              </span>
-            </Link>
+              {user ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label={translate(locale, "navigation.account")}
+                    aria-haspopup="menu"
+                    aria-expanded={isAccountOpen}
+                    onClick={() => setIsAccountOpen((value) => !value)}
+                    className="flex h-9 items-center justify-center gap-1 rounded-full px-2 text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 sm:h-10 sm:px-3"
+                  >
+                    <UserRound className="h-4 w-4" />
+                    <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">
+                      {user.name || user.email}
+                    </span>
+                    <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
+                  </button>
+                  {isAccountOpen && (
+                    <div
+                      role="menu"
+                      aria-label={translate(locale, "navigation.account")}
+                      className="absolute end-0 top-full z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 text-start shadow-xl"
+                    >
+                      <div className="border-b border-slate-100 px-3 py-3">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {user.name || translate(locale, "navigation.welcome")}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {user.email}
+                        </p>
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          {translate(
+                            locale,
+                            user.role === "ADMIN"
+                              ? "navigation.administrator"
+                              : "navigation.customer",
+                          )}
+                        </p>
+                      </div>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          role="menuitem"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="mt-1 block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {translate(locale, "navigation.admin")}
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => void signOut({ callbackUrl: "/login" })}
+                        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-start text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        {translate(locale, "navigation.logout")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  aria-label={translate(locale, "navigation.account")}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 sm:h-10 sm:w-10"
+                >
+                  <UserRound className="h-4 w-4" />
+                </Link>
+              )}
+              <Link
+                href="/cart"
+                aria-label={`${translate(locale, "navigation.cart")}: ${cartCount}`}
+                className="inline-flex h-9 items-center gap-1 rounded-full bg-slate-950 px-2.5 text-[11px] font-medium text-white transition hover:bg-slate-800 sm:h-10 sm:gap-2 sm:px-4 sm:text-sm"
+              >
+                <span className="relative inline-flex">
+                  <ShoppingBag className="h-4 w-4" />
+                  {cartCount > 0 && (
+                    <span className="absolute -end-2 -top-2 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-bold leading-none text-slate-950">
+                      {cartCount}
+                    </span>
+                  )}
+                </span>
+                <span className="hidden sm:inline">
+                  {translate(locale, "navigation.cart")}
+                </span>
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
-
       </header>
 
       <div className="sticky top-0 z-[100] bg-slate-950 text-white shadow-sm">
@@ -454,7 +465,10 @@ export function SiteHeaderClient({
           <nav className="hidden min-h-14 items-center gap-5 text-sm font-medium text-white lg:flex lg:gap-7">
             {visibleNavItems.map((item) => (
               <div key={item.key} className="group relative">
-                <Link href={item.href} className="transition hover:text-cyan-300">
+                <Link
+                  href={item.href}
+                  className="transition hover:text-cyan-300"
+                >
                   {translate(locale, `navigation.${item.key}`)}
                 </Link>
                 {item.key === "categories" && categories.length > 0 && (
