@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   sslcommerz-lts@1.2.0:
-    hash: zng7b3ywrawffr3d33ywxogzse
+    hash: 33248b718acd7509ccebb1c280f9373e4fe00e20c5bd9932922f6ad9aa9bdc24
     path: patches/sslcommerz-lts@1.2.0.patch
 
 importers:
@@ -60,7 +60,7 @@ importers:
         version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       sslcommerz-lts:
         specifier: 1.2.0
-        version: 1.2.0(patch_hash=zng7b3ywrawffr3d33ywxogzse)
+        version: 1.2.0(patch_hash=33248b718acd7509ccebb1c280f9373e4fe00e20c5bd9932922f6ad9aa9bdc24)
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -4893,7 +4893,7 @@ snapshots:
 
   source-map-js@1.2.2: {}
 
-  sslcommerz-lts@1.2.0(patch_hash=zng7b3ywrawffr3d33ywxogzse):
+  sslcommerz-lts@1.2.0(patch_hash=33248b718acd7509ccebb1c280f9373e4fe00e20c5bd9932922f6ad9aa9bdc24):
     dependencies:
       form-data: 2.5.5
       node-fetch: 2.6.7
