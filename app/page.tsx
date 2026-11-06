@@ -174,7 +174,7 @@ export default async function Home() {
               </Button>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {featuredCatalog.products.map((product) => (
                 <ProductCard key={product.id} product={product} locale={locale} />
               ))}
@@ -193,7 +193,7 @@ export default async function Home() {
                 <Link href="/shop">{t("home.browseCollection")}</Link>
               </Button>
             </div>
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {newArrivalsCatalog.products.map((product) => (
                 <ProductCard key={product.id} product={product} locale={locale} />
               ))}
