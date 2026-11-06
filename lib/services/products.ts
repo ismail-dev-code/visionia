@@ -34,6 +34,7 @@ export type CatalogFilters = {
   search?: string;
   isFeatured?: boolean;
   isNewArrival?: boolean;
+  discountedOnly?: boolean;
   sort?: ProductSort;
   minPrice?: number;
   maxPrice?: number;
@@ -157,6 +158,10 @@ export async function getProducts(filters: CatalogFilters = {}, locale: Locale =
 
     if (filters.isNewArrival !== undefined) {
       where.isNewArrival = filters.isNewArrival;
+    }
+
+    if (filters.discountedOnly) {
+      where.discountPrice = { not: null };
     }
 
     if (filters.search) {

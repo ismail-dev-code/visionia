@@ -4,7 +4,6 @@ import { ArrowRight, Cable, Headphones, Package2, Plug, ShieldCheck, Zap } from 
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getTranslations } from "@/lib/i18n";
 import { getCategories } from "@/lib/services/products";
 
@@ -54,10 +53,10 @@ export default async function CategoriesPage() {
                   <span className="text-sm text-slate-500">{category.productCount} {t("categories.items")}</span>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{category.description || t("categories.fallbackDescription")}</p>
-                <Button variant="ghost" className="mt-5 rounded-full px-0 text-slate-900 hover:bg-transparent hover:text-cyan-700">
+                <span className="mt-5 inline-flex h-9 items-center gap-2 text-sm font-medium text-slate-900 transition group-hover:text-cyan-700">
                   {t("categories.browse")}
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                </span>
               </Link>
             );
           })}

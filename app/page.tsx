@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { HeroVisual } from "@/components/home/hero-visual";
+import { NewsletterForm } from "@/components/layout/newsletter-form";
 import { ProductCard } from "@/components/products/product-card";
 import { getTranslations } from "@/lib/i18n";
 import { getCategories, getProducts } from "@/lib/services/products";
@@ -87,12 +88,14 @@ export default async function Home() {
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Button size="lg" className="gap-2 rounded-full px-6">
-                  {t("home.shopNow")}
-                  <ArrowRight className="h-4 w-4" />
+                <Button asChild size="lg" className="gap-2 rounded-full px-6">
+                  <Link href="/shop">
+                    {t("home.shopNow")}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </Button>
-                <Button variant="outline" size="lg" className="rounded-full px-6">
-                  {t("home.exploreCategories")}
+                <Button asChild variant="outline" size="lg" className="rounded-full px-6">
+                  <Link href="/categories">{t("home.exploreCategories")}</Link>
                 </Button>
               </div>
 
@@ -259,17 +262,12 @@ export default async function Home() {
               <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em]">{t("home.exclusiveOffers")}</h2>
             </div>
 
-            <div className="flex w-full max-w-xl flex-col gap-3 sm:flex-row">
-              <input
-                aria-label={t("auth.email")}
-                type="email"
-                placeholder={t("footer.emailPlaceholder")}
-                className="h-12 flex-1 rounded-full border border-slate-700 bg-slate-900 px-4 text-sm text-white placeholder:text-slate-400 focus:border-cyan-400 focus:outline-none"
-              />
-              <Button className="h-12 rounded-full bg-cyan-400 px-6 text-slate-950 hover:bg-cyan-300">
-                {t("home.subscribe")}
-              </Button>
-            </div>
+            <NewsletterForm
+              className="w-full max-w-xl"
+              emailLabel={t("auth.email")}
+              emailPlaceholder={t("footer.emailPlaceholder")}
+              subscribeLabel={t("home.subscribe")}
+            />
           </div>
         </section>
       </main>

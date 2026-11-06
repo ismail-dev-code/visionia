@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 
+import { NewsletterForm } from "@/components/layout/newsletter-form";
 import { getTranslations } from "@/lib/i18n";
 import Image from "next/image";
 
@@ -37,11 +38,15 @@ export async function SiteFooter() {
             </div>
             <div className="flex items-center gap-3">
               <Phone className="h-4 w-4 text-cyan-400" />
-              +880 1700-000000
+              <Link href="tel:+8801700000000" className="hover:text-white">
+                +880 1700-000000
+              </Link>
             </div>
             <div className="flex items-center gap-3">
               <Mail className="h-4 w-4 text-cyan-400" />
-              hello@visionia.tech
+              <Link href="mailto:hello@visionia.tech" className="hover:text-white">
+                hello@visionia.tech
+              </Link>
             </div>
           </div>
         </div>
@@ -109,20 +114,11 @@ export async function SiteFooter() {
           <p className="mb-4 text-sm leading-7 text-slate-300">
             {t("footer.newsletterDescription")}
           </p>
-          <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 p-1">
-            <input
-              type="email"
-              aria-label={t("auth.email")}
-              placeholder={t("footer.emailPlaceholder")}
-              className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
-            />
-            <button
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-400 text-slate-950 transition hover:bg-cyan-300"
-              aria-label={t("footer.subscribe")}
-            >
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
+          <NewsletterForm
+            emailLabel={t("auth.email")}
+            emailPlaceholder={t("footer.emailPlaceholder")}
+            subscribeLabel={t("footer.subscribe")}
+          />
         </div>
       </div>
 
