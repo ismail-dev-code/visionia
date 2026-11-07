@@ -4,7 +4,7 @@ This guide is based on the checked-in application, Prisma schema, and migration 
 
 ## 1. Prerequisites
 
-- Node.js 20.9 or newer (Node.js 22 is suitable).
+- Node.js 22.14.0 or newer (the checked-in `.nvmrc` selects 22.14.0).
 - pnpm 10.17.0, matching `package.json`.
 - Git.
 - A PostgreSQL database. Supabase PostgreSQL is the documented hosted option; a local PostgreSQL instance also works.
@@ -61,7 +61,7 @@ For a fresh database or an existing database that needs the committed migrations
 ```sh
 pnpm exec prisma validate
 pnpm exec prisma generate
-pnpm exec prisma migrate deploy
+pnpm db:migrate
 ```
 
 The repository includes migrations for the schema. `migrate deploy` applies pending migrations without resetting data. For local schema development, use `pnpm exec prisma migrate dev` to create and apply a migration, then commit that migration with the schema change. Do not use `prisma migrate reset` on a database with data you need, and do not use `prisma db push` as a substitute for the checked-in production migration history.
@@ -88,6 +88,7 @@ Useful project scripts:
 | `pnpm lint` | Run ESLint |
 | `pnpm typecheck` | Run the TypeScript check |
 | `pnpm db:generate` | Generate Prisma Client |
+| `pnpm db:migrate` | Apply committed Prisma migrations with `migrate deploy` |
 | `pnpm db:studio` | Open Prisma Studio |
 | `pnpm db:seed` | Sync official categories and initialize the product SKU counter |
 
@@ -157,6 +158,7 @@ NEXT_PUBLIC_SITE_URL="https://your-public-test-origin.example"
 ```
 
 The callback origin must be an absolute URL. The payment gateway must be able to reach the callback routes; plain `localhost` is not reachable by the gateway. In production, the app enforces HTTPS for this URL. Store secrets only in the server's environment/secret manager, never in client code or source control.
+The app constructs its success, failure, cancellation, and IPN callback URLs under `/api/payment/sslcommerz/`. These are the only configured callback routes.
 
 For live payments, use the merchant's approved live credentials, set `SSLCOMMERZ_IS_SANDBOX="false"`, and use the production HTTPS site origin. Verify the merchant account and callback behavior before accepting real payments. Do not mix sandbox credentials with live mode or vice versa.
 
@@ -166,7 +168,7 @@ There is no VPS deployment configuration committed in this repository. A self-ma
 
 At a high level:
 
-1. Provision a supported Linux VPS with Node.js 20.9+, pnpm 10.17.0, and a network path to PostgreSQL. Use a dedicated, non-root service account.
+1. Provision a supported Linux VPS with Node.js 22.14.0 or newer, pnpm 10.17.0, and a network path to PostgreSQL. Use a dedicated, non-root service account.
 2. Clone a reviewed release of the repository and install dependencies with `pnpm install --frozen-lockfile`.
 3. Configure the production environment outside Git. Set `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, and `NEXT_PUBLIC_SITE_URL` to production values. Add the SSLCommerz variables only if live payments are enabled.
 4. Apply the committed migrations and build:

@@ -218,6 +218,7 @@ model CartItem {
 
   @@unique([cartId, productId, variantKey])
   @@index([cartId])
+  @@index([productId])
   @@index([variantId])
 }
 
@@ -242,6 +243,7 @@ model WishlistItem {
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([wishlistId, productId])
+  @@index([productId])
 }
 
 model Address {
@@ -292,6 +294,7 @@ model Order {
   payments        Payment[]
 
   @@index([userId])
+  @@index([addressId])
 }
 
 model OrderItem {
@@ -313,6 +316,7 @@ model OrderItem {
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+  @@index([productId])
   @@index([variantId])
 }
 
@@ -331,6 +335,8 @@ model CheckoutIntent {
   order   Order?
 
   @@index([userId])
+  @@index([productId])
+  @@index([variantId])
   @@index([expiresAt])
 }
 
@@ -398,6 +404,8 @@ model Coupon {
   updatedAt   DateTime @updatedAt
 
   createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
 }
 
 model Review {
@@ -414,6 +422,7 @@ model Review {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
+  @@index([productId])
 }
 
 model Banner {

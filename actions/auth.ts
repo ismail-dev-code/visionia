@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 import { prisma } from "@/lib/db";
@@ -20,19 +21,30 @@ export async function registerUser(input: unknown) {
   });
 
   if (existingUser) {
-    throw new Error("An account already exists for this email address.");
+    return { success: true };
   }
 
   const hashedPassword = await hash(password, 10);
 
-  await prisma.user.create({
-    data: {
-      name,
-      email: normalizedEmail,
-      password: hashedPassword,
-      role: "CUSTOMER",
-    },
-  });
+  try {
+    await prisma.user.create({
+      data: {
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: "CUSTOMER",
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === "P2002"
+    ) {
+      return { success: true };
+    }
+
+    throw error;
+  }
 
   return { success: true };
 }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,14 +6,21 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 
 import { registerUser } from "@/actions/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { translate, type Locale } from "@/lib/i18n-shared";
-import { loginSchema, registerSchema } from "@/lib/validations/auth";
+import {
+  loginSchema,
+  registerSchema,
+  type LoginInput,
+  type RegisterInput,
+} from "@/lib/validations/auth";
 import Image from "next/image";
+
+type AuthFormValues = LoginInput & Partial<Pick<RegisterInput, "name">>;
 
 type AuthFormProps = {
   mode: "login" | "register";
@@ -38,12 +44,12 @@ export function AuthForm({
       ? { email: "", password: "" }
       : { name: "", email: "", password: "" };
 
-  const form = useForm<any>({
-    resolver: zodResolver(schema as any),
+  const form = useForm<AuthFormValues>({
+    resolver: zodResolver(schema) as Resolver<AuthFormValues>,
     defaultValues,
   });
 
-  const onSubmit = async (values: Record<string, string>) => {
+  const onSubmit = async (values: AuthFormValues) => {
     setError(null);
     setIsSubmitting(true);
 

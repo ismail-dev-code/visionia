@@ -417,6 +417,9 @@ CREATE UNIQUE INDEX "Cart_userId_key" ON "Cart"("userId");
 CREATE INDEX "CartItem_cartId_idx" ON "CartItem"("cartId");
 
 -- CreateIndex
+CREATE INDEX "CartItem_productId_idx" ON "CartItem"("productId");
+
+-- CreateIndex
 CREATE INDEX "CartItem_variantId_idx" ON "CartItem"("variantId");
 
 -- CreateIndex
@@ -424,6 +427,9 @@ CREATE UNIQUE INDEX "CartItem_cartId_productId_variantKey_key" ON "CartItem"("ca
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Wishlist_userId_key" ON "Wishlist"("userId");
+
+-- CreateIndex
+CREATE INDEX "WishlistItem_productId_idx" ON "WishlistItem"("productId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "WishlistItem_wishlistId_productId_key" ON "WishlistItem"("wishlistId", "productId");
@@ -441,13 +447,25 @@ CREATE UNIQUE INDEX "Order_orderNumber_key" ON "Order"("orderNumber");
 CREATE INDEX "Order_userId_idx" ON "Order"("userId");
 
 -- CreateIndex
+CREATE INDEX "Order_addressId_idx" ON "Order"("addressId");
+
+-- CreateIndex
 CREATE INDEX "OrderItem_orderId_idx" ON "OrderItem"("orderId");
+
+-- CreateIndex
+CREATE INDEX "OrderItem_productId_idx" ON "OrderItem"("productId");
 
 -- CreateIndex
 CREATE INDEX "OrderItem_variantId_idx" ON "OrderItem"("variantId");
 
 -- CreateIndex
 CREATE INDEX "CheckoutIntent_userId_idx" ON "CheckoutIntent"("userId");
+
+-- CreateIndex
+CREATE INDEX "CheckoutIntent_productId_idx" ON "CheckoutIntent"("productId");
+
+-- CreateIndex
+CREATE INDEX "CheckoutIntent_variantId_idx" ON "CheckoutIntent"("variantId");
 
 -- CreateIndex
 CREATE INDEX "CheckoutIntent_expiresAt_idx" ON "CheckoutIntent"("expiresAt");
@@ -478,6 +496,12 @@ CREATE INDEX "PaymentRefund_status_idx" ON "PaymentRefund"("status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Coupon_code_key" ON "Coupon"("code");
+
+-- CreateIndex
+CREATE INDEX "Coupon_createdById_idx" ON "Coupon"("createdById");
+
+-- CreateIndex
+CREATE INDEX "Review_productId_idx" ON "Review"("productId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Review_userId_productId_key" ON "Review"("userId", "productId");

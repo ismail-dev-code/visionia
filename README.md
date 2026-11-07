@@ -18,9 +18,7 @@ Visionia aims to provide customers with a smooth shopping experience and adminis
 - Cash on delivery with a à§³50 advance when shipping is charged; the advance is credited toward the delivery balance.
 - Wishlist management.
 - Customer registration and login.
-- Google authentication.
-- Email verification.
-- Customer profile and order history.
+- Signed-in customers can view their own order confirmation pages.
 - Responsive design for mobile, tablet, and desktop.
 
 ### Admin Features
@@ -72,10 +70,10 @@ Additional internationalization features:
 
 Make sure you have installed:
 
-- Node.js
-- pnpm
+- Node.js 22.14.0 (see `.nvmrc`)
+- pnpm 10.17.0
 - Git
-- Supabase account
+- A PostgreSQL database (Supabase is supported)
 
 Check your versions:
 
@@ -94,51 +92,50 @@ cd visionia
 ### 2. Install Dependencies
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file in the project root.
+Copy `.env.example` to `.env` and replace the required placeholders. In PowerShell, use `Copy-Item .env.example .env`.
 
 Example:
 
 ```env
-# Database
-DATABASE_URL="YOUR_SUPABASE_DATABASE_URL"
-DIRECT_URL="YOUR_SUPABASE_DIRECT_DATABASE_URL"
+# Required PostgreSQL connection strings
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"
 
-# Authentication
-AUTH_SECRET="YOUR_AUTH_SECRET"
+# Required Auth.js secret; generate a unique value with `openssl rand -base64 32`.
+AUTH_SECRET="replace-with-a-random-secret"
+
+# Optional callback origin and URL fallbacks
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+AUTH_URL="http://localhost:3000"
 NEXTAUTH_URL="http://localhost:3000"
 
-# Optional version-skew protection. Set to a unique build/deployment ID in self-hosted production.
-NEXT_DEPLOYMENT_ID=""
-
-# Payment callbacks
-NEXT_PUBLIC_SITE_URL="http://localhost:3000"
-SSLCOMMERZ_STORE_ID=""
-SSLCOMMERZ_STORE_PASSWORD=""
+# Optional: configure only when enabling SSLCommerz payments
+SSLCOMMERZ_STORE_ID="replace-with-your-store-id"
+SSLCOMMERZ_STORE_PASSWORD="replace-with-your-store-password"
 SSLCOMMERZ_IS_SANDBOX="true"
 
-# Google OAuth
-GOOGLE_CLIENT_ID=""
-GOOGLE_CLIENT_SECRET=""
+# Optional: use a unique ID for self-hosted deployments; Vercel sets its own.
+NEXT_DEPLOYMENT_ID="replace-with-a-unique-deployment-id"
+VERCEL_DEPLOYMENT_ID=""
 
-# Email Service
-RESEND_API_KEY=""
-EMAIL_FROM=""
-
+# Normally set automatically by Next.js
+NODE_ENV="development"
 ```
 
 **Important:**
 
-- Replace placeholder values with your actual credentials.
+- `DATABASE_URL`, `DIRECT_URL`, and `AUTH_SECRET` are required for normal setup.
+- SSLCommerz credentials and callback origin are optional unless online payments are enabled.
 - Never commit `.env` to GitHub.
 - Never expose database passwords or secret API keys.
 - Use the exact environment variable names required by your application.
 - Keep SSLCommerz credentials server-side. Configure sandbox credentials for testing, then switch `SSLCOMMERZ_IS_SANDBOX` to `false` only after the merchant account is approved for live payments.
-- Set `NEXT_PUBLIC_SITE_URL` in the same environment as the server credentials (`.env.local` for local development). It must be the public HTTPS origin in production so payment callbacks return to the correct site.
+- Set `NEXT_PUBLIC_SITE_URL` alongside the server credentials (`.env` or `.env.local` for local development). It must be the public HTTPS origin in production so payment callbacks return to the correct site.
 - For self-hosted deployments, set `NEXT_DEPLOYMENT_ID` to a unique value for each release so Next.js can refresh clients when Server Action versions change. Vercel deployments use `VERCEL_DEPLOYMENT_ID` automatically.
 
 ### SSLCommerz and COD
@@ -147,11 +144,12 @@ The checkout can collect the full order total through SSLCommerz or collect a à§
 
 SSLCommerz credentials are not included in the repository. Payment callbacks validate transactions server-side before marking payments paid. Admin order details include protected transaction/session queries and refund initiation/status checks. A submitted refund remains pending until its gateway status is queried and verified.
 
-To enable payments, add the merchant environment variables above and apply the additive payment migrations using `pnpm exec prisma migrate deploy` after reviewing them for your deployment. Do not use `prisma migrate reset` on a database with existing data.
+To enable payments, add the merchant environment variables above and apply pending migrations with `pnpm db:migrate`. Do not use `prisma migrate reset` on a database with existing data.
 
 ## Database Setup
 
 Visionia uses Prisma with Supabase PostgreSQL.
+The committed Prisma migrations are the source of truth for application setup. `database/schema.sql` is generated from the Prisma schema and is intended only for an empty database; do not apply it to a migrated or populated database.
 
 ### Validate Prisma Schema
 
@@ -174,8 +172,10 @@ pnpm exec prisma migrate dev
 ### Apply Production Migrations
 
 ```bash
-pnpm exec prisma migrate deploy
+pnpm db:migrate
 ```
+
+For a demo catalog, apply the migrations, then run `database/seed.sql` against a fresh demo database using Supabase SQL Editor or `psql`. This adds categories and sample products only. `pnpm db:seed` initializes official categories and the SKU counter; it does not create products or an admin account.
 
 ### Open Prisma Studio
 
@@ -205,6 +205,14 @@ To stop the server:
 Ctrl + C
 ```
 
+For a production run, first configure the production environment and apply the committed migrations, then build and start:
+
+```bash
+pnpm db:migrate
+pnpm build
+pnpm start
+```
+
 ## Available Commands
 
 | Command                     | Description                    |
@@ -216,6 +224,7 @@ Ctrl + C
 | `pnpm exec tsc --noEmit`    | Check TypeScript types         |
 | `pnpm exec prisma validate` | Validate Prisma schema         |
 | `pnpm exec prisma generate` | Generate Prisma Client         |
+| `pnpm db:migrate`           | Apply committed migrations     |
 | `pnpm exec prisma studio`   | Open Prisma Studio             |
 
 Run `pnpm run` to see all available project scripts.
@@ -268,9 +277,8 @@ Security requirements:
 - Verify permissions on the server.
 - Prevent customers from modifying their own roles.
 - Use secure authentication sessions.
-- Use expiring, single-use email verification tokens.
 
-Google authentication requires valid OAuth credentials and configured callback URLs.
+The current sign-in provider is email/password credentials. Google OAuth and email verification are not implemented.
 
 ## Project Structure
 
@@ -344,16 +352,14 @@ Recommended deployment workflow:
 2. Connect the repository to Vercel or another Next.js-compatible hosting provider.
 3. Configure environment variables.
 4. Configure production database access.
-5. Configure Google OAuth callback URLs.
-6. Configure email delivery.
-7. Apply database migrations:
+5. Apply database migrations:
 
 ```bash
-pnpm exec prisma migrate deploy
+pnpm db:migrate
 ```
 
-8. Deploy the application.
-9. Test authentication, product management, cart, checkout, and admin access.
+6. Build and deploy the application.
+7. Test credentials-based authentication, product management, cart, checkout, payment callbacks (sandbox first), and admin access.
 
 Never publish production credentials.
 
@@ -399,14 +405,9 @@ Ensure the correct Supabase project is configured and migrations have been appli
 
 Restart the Next.js development server after updating `.env`.
 
-### Google Login Not Working
+### Authentication Configuration
 
-Verify:
-
-- Google Client ID.
-- Google Client Secret.
-- OAuth callback URL.
-- Authentication provider configuration.
+The current app supports email/password registration and login only. Google OAuth and email delivery are not implemented; adding OAuth or email environment variables will not enable those features.
 
 ## Contributing
 

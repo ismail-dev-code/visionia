@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { compare } from "bcryptjs";
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { prisma } from "@/lib/db";
@@ -9,18 +8,7 @@ import { loginSchema } from "@/lib/validations/auth";
 
 type AuthRole = "ADMIN" | "CUSTOMER";
 
-type JwtToken = {
-  userId?: string;
-  role?: AuthRole;
-  [key: string]: unknown;
-};
-
-type SessionUser = {
-  id?: string;
-  role?: AuthRole;
-};
-
-export const authOptions = {
+export const authOptions: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt" as const,
@@ -69,18 +57,28 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }: { token: JwtToken; user?: { id?: string; role?: AuthRole } }) {
+    async jwt({ token, user }) {
+      const extendedToken = token as typeof token & {
+        userId?: string;
+        role?: AuthRole;
+      };
+
       if (user) {
-        token.userId = user.id;
-        token.role = user.role as AuthRole;
+        extendedToken.userId = user.id;
+        extendedToken.role = user.role === "ADMIN" ? "ADMIN" : "CUSTOMER";
       }
 
-      return token;
+      return extendedToken;
     },
-    async session({ session, token }: { session: { user?: SessionUser }; token: JwtToken }) {
+    async session({ session, token }) {
+      const extendedToken = token as typeof token & {
+        userId?: string;
+        role?: AuthRole;
+      };
+
       if (session.user) {
-        session.user.id = token.userId ?? "";
-        session.user.role = (token.role ?? "CUSTOMER") as AuthRole;
+        session.user.id = extendedToken.userId ?? "";
+        session.user.role = extendedToken.role ?? "CUSTOMER";
       }
 
       return session;
@@ -89,4 +87,4 @@ export const authOptions = {
   secret: process.env.AUTH_SECRET,
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions as any);
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);

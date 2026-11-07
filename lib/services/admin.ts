@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { requireAdmin } from "@/lib/admin";
 import { getLocalizedText, type Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/db";
 import { OFFICIAL_CATEGORY_SLUGS } from "@/lib/constants/categories";
@@ -15,6 +16,8 @@ function toNumber(value: number | string | Prisma.Decimal | null | undefined) {
 }
 
 export async function getDashboardStats() {
+  await requireAdmin();
+
   const [orderCount, customerCount, productCount, revenueResult, pendingCount, completedCount, lowStockCount, recentOrders, recentCustomers, topProducts] = await Promise.all([
     prisma.order.count(),
     prisma.user.count({ where: { role: "CUSTOMER" } }),
@@ -98,6 +101,8 @@ export async function getAdminProducts({
   published?: boolean;
   stock?: "low" | "in-stock" | "out";
 } = {}) {
+  await requireAdmin();
+
   const products = await prisma.product.findMany({
     where: {
       ...(search
@@ -146,6 +151,8 @@ export async function getAdminProducts({
 }
 
 export async function getAdminCategories(locale: Locale = "en") {
+  await requireAdmin();
+
   const categories = await prisma.category.findMany({
     where: {
       isActive: true,
@@ -169,6 +176,8 @@ export async function getAdminCategories(locale: Locale = "en") {
 }
 
 export async function getNextProductSku() {
+  await requireAdmin();
+
   const counter = await prisma.productSkuCounter.findUnique({
     where: { id: "product" },
     select: { lastValue: true },
@@ -187,6 +196,8 @@ export async function getAdminOrders({
   search?: string;
   status?: string;
 } = {}) {
+  await requireAdmin();
+
   const orders = await prisma.order.findMany({
     where: {
       ...(status ? { status: status as never } : {}),
@@ -286,6 +297,8 @@ export async function getAdminOrders({
 }
 
 export async function getAdminCustomers({ search }: { search?: string } = {}) {
+  await requireAdmin();
+
   const users = await prisma.user.findMany({
     where: {
       role: "CUSTOMER",
@@ -318,6 +331,8 @@ export async function getAdminCustomers({ search }: { search?: string } = {}) {
 }
 
 export async function getAdminCoupons({ search }: { search?: string } = {}) {
+  await requireAdmin();
+
   const coupons = await prisma.coupon.findMany({
     where: search
       ? {
@@ -338,6 +353,8 @@ export async function getAdminCoupons({ search }: { search?: string } = {}) {
 }
 
 export async function getAdminBanners({ search }: { search?: string } = {}) {
+  await requireAdmin();
+
   const banners = await prisma.banner.findMany({
     where: search
       ? {
@@ -358,6 +375,8 @@ export async function getAdminBanners({ search }: { search?: string } = {}) {
 }
 
 export async function getAdminReviews({ search, rating }: { search?: string; rating?: number } = {}) {
+  await requireAdmin();
+
   const reviews = await prisma.review.findMany({
     where: {
       ...(rating ? { rating } : {}),
@@ -391,6 +410,8 @@ export async function getAdminReviews({ search, rating }: { search?: string; rat
 }
 
 export async function getNewsletterSubscribers({ search }: { search?: string } = {}) {
+  await requireAdmin();
+
   return prisma.newsletterSubscriber.findMany({
     where: search
       ? {
@@ -402,6 +423,8 @@ export async function getNewsletterSubscribers({ search }: { search?: string } =
 }
 
 export async function getStoreSettings() {
+  await requireAdmin();
+
   return {
     storeName: "Visionia",
     storeSubtitle: "Premium electronics essentials",
