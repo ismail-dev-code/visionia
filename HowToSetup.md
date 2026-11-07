@@ -27,7 +27,7 @@ corepack prepare pnpm@10.17.0 --activate
 pnpm install --frozen-lockfile
 ```
 
-Keep `pnpm-lock.yaml` with the project and use the frozen install in CI/deployment so package versions remain consistent.
+`pnpm-lock.yaml` is the authoritative lockfile. The additional `package-lock.json` is provided for tooling that expects npm metadata, but the SSLCommerz SDK relies on a pnpm patch checked in under `patches/`; npm installs do not apply that patch. Use pnpm with the frozen lockfile for supported development and deployment installs.
 
 ## 3. Configure PostgreSQL
 

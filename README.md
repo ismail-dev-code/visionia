@@ -95,6 +95,8 @@ cd visionia
 pnpm install --frozen-lockfile
 ```
 
+`pnpm-lock.yaml` is the authoritative lockfile. Although an npm `package-lock.json` is included for tooling compatibility, npm does not apply the repository's SSLCommerz SDK patch; use pnpm for supported installs and deployments.
+
 ### 3. Configure Environment Variables
 
 Copy `.env.example` to `.env` and replace the required placeholders. In PowerShell, use `Copy-Item .env.example .env`.
